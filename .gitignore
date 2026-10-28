@@ -1,0 +1,27 @@
+# 비밀값
+.env
+.env.*
+!.env.example
+
+# Gradle
+.gradle/
+build/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS / 로그
+.DS_Store
+Thumbs.db
+*.log
+
+# Claude / OMC 로컬 상태
+.omc/
+.claude/settings.local.json

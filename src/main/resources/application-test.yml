@@ -1,0 +1,8 @@
+# 테스트용. DB 접속 정보는 Testcontainers가 주입한다.
+spring:
+  datasource:
+    username: ${DB_USERNAME:test}
+    password: ${DB_PASSWORD:test}
+
+external:
+  mock: true

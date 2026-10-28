@@ -1,0 +1,8 @@
+# 로컬 개발용. 값은 .env(환경변수)에서 주입한다.
+logging:
+  level:
+    com.tripplanner: DEBUG
+
+app:
+  cors:
+    allowed-origins: http://localhost:5173
