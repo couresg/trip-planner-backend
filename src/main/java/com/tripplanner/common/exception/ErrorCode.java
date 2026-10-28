@@ -10,6 +10,7 @@ public enum ErrorCode {
     CITY_AIRPORT_MISMATCH(HttpStatus.BAD_REQUEST, "도시와 공항 불일치"),
     DATE_OUT_OF_TRIP(HttpStatus.BAD_REQUEST, "여행 기간 밖 날짜"),
     FORBIDDEN_TRIP(HttpStatus.FORBIDDEN, "소유 토큰 불일치"),
+    CITY_NOT_FOUND(HttpStatus.NOT_FOUND, "도시를 찾을 수 없음"),
     TRIP_NOT_FOUND(HttpStatus.NOT_FOUND, "여행을 찾을 수 없음"),
     FLIGHT_NOT_FOUND(HttpStatus.NOT_FOUND, "항공편을 찾을 수 없음"),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청 한도 초과"),
