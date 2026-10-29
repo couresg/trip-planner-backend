@@ -1,0 +1,16 @@
+[
+  {
+    "number": "LJ 231",
+    "status": "Canceled",
+    "departure": {
+      "airport": { "icao": "RKSI", "iata": "ICN", "name": "Seoul Incheon", "timeZone": "Asia/Seoul" },
+      "scheduledTime": { "utc": "2026-11-04 22:00Z", "local": "2026-11-05 07:00+09:00" },
+      "terminal": "1"
+    },
+    "arrival": {
+      "airport": { "icao": "RJBB", "iata": "KIX", "name": "Osaka Kansai", "timeZone": "Asia/Tokyo" },
+      "scheduledTime": { "utc": "2026-11-04 23:45Z", "local": "2026-11-05 08:45+09:00" }
+    },
+    "airline": { "name": "Jin Air", "iata": "LJ", "icao": "JNA" }
+  }
+]

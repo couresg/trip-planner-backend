@@ -1,0 +1,17 @@
+[
+  {
+    "number": "7C 1302",
+    "status": "Expected",
+    "departure": {
+      "airport": { "icao": "RKSI", "iata": "ICN", "name": "Seoul Incheon", "timeZone": "Asia/Seoul" },
+      "scheduledTime": { "utc": "2026-11-05 13:30Z", "local": "2026-11-05 22:30+09:00" },
+      "terminal": "1"
+    },
+    "arrival": {
+      "airport": { "icao": "RJBB", "iata": "KIX", "name": "Osaka Kansai", "timeZone": "Asia/Tokyo" },
+      "scheduledTime": { "utc": "2026-11-05 15:20Z", "local": "2026-11-06 00:20+09:00" },
+      "terminal": "1"
+    },
+    "airline": { "name": "Jeju Air", "iata": "7C", "icao": "JJA" }
+  }
+]

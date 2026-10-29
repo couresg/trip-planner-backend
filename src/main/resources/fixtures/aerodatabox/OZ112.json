@@ -1,0 +1,19 @@
+[
+  {
+    "number": "OZ 112",
+    "status": "Delayed",
+    "departure": {
+      "airport": { "icao": "RKSI", "iata": "ICN", "name": "Seoul Incheon", "timeZone": "Asia/Seoul" },
+      "scheduledTime": { "utc": "2026-11-05 00:00Z", "local": "2026-11-05 09:00+09:00" },
+      "revisedTime": { "utc": "2026-11-05 01:30Z", "local": "2026-11-05 10:30+09:00" },
+      "terminal": "1"
+    },
+    "arrival": {
+      "airport": { "icao": "RJBB", "iata": "KIX", "name": "Osaka Kansai", "timeZone": "Asia/Tokyo" },
+      "scheduledTime": { "utc": "2026-11-05 01:50Z", "local": "2026-11-05 10:50+09:00" },
+      "revisedTime": { "utc": "2026-11-05 03:20Z", "local": "2026-11-05 12:20+09:00" },
+      "terminal": "1"
+    },
+    "airline": { "name": "Asiana", "iata": "OZ", "icao": "AAR" }
+  }
+]

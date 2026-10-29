@@ -1,0 +1,22 @@
+[
+  {
+    "number": "KE 723",
+    "status": "Expected",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "departure": {
+      "airport": { "icao": "RKSI", "iata": "ICN", "name": "Seoul Incheon", "timeZone": "Asia/Seoul" },
+      "scheduledTime": { "utc": "2026-11-05 03:00Z", "local": "2026-11-05 12:00+09:00" },
+      "terminal": "2",
+      "quality": ["Basic"]
+    },
+    "arrival": {
+      "airport": { "icao": "RJBB", "iata": "KIX", "name": "Osaka Kansai", "timeZone": "Asia/Tokyo" },
+      "scheduledTime": { "utc": "2026-11-05 04:45Z", "local": "2026-11-05 13:45+09:00" },
+      "revisedTime": { "utc": "2026-11-05 04:52Z", "local": "2026-11-05 13:52+09:00" },
+      "terminal": "1",
+      "quality": ["Basic"]
+    },
+    "airline": { "name": "Korean Air", "iata": "KE", "icao": "KAL" }
+  }
+]

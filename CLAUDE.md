@@ -65,14 +65,14 @@ com.tripplanner
 
 - **시간 계산 로직(ScheduleExpander, ArrivalTransferService, DepartureTransferService)은 단위 테스트 필수.** 고정 `Clock`과 경계값(자정, 막차 직후, 첫차 직전, 요일 경계)을 포함한다.
 - 리포지토리·통합 테스트는 Testcontainers MySQL (H2 사용 금지: MySQL 문법 차이).
-- 외부 API는 fixture JSON(`src/test/resources/fixtures/aerodatabox/*.json`)으로 테스트한다. 테스트에서 실제 API를 호출하지 않는다.
+- 외부 API는 fixture JSON(`src/main/resources/fixtures/aerodatabox/*.json`, 로컬 Mock 클라이언트와 공용)으로 테스트한다. HTTP 계층은 `MockRestServiceServer`로 대체한다. 테스트에서 실제 API를 호출하지 않는다.
 - 테스트 이름은 한글 `@DisplayName`으로 시나리오를 적는다. 예: `"23시30분 도착이면 자정 넘어 01시30분까지의 출발편을 조회한다"`
 
 ## DB
 
 - 스키마 변경 = Flyway 새 버전 파일 추가. 이미 적용된 마이그레이션 파일은 수정하지 않는다.
 - `spring.jpa.hibernate.ddl-auto=validate`, `open-in-view=false`
-- 시드 데이터는 `V100` 이후 번호를 쓴다.
+- 시드 데이터는 `V100` 이후 번호를 쓰고, 스키마 변경은 `V2`~`V99`를 쓴다. 시드 뒤에 스키마 버전이 추가되므로 `spring.flyway.out-of-order=true`로 설정되어 있다.
 
 ## 하지 말 것
 

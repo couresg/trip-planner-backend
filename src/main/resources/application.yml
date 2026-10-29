@@ -13,11 +13,17 @@ spring:
       hibernate.jdbc.time_zone: UTC
   flyway:
     enabled: true
+    # 스키마는 V1~V99, 시드는 V100+ 번호를 쓰므로 시드 적용 후 추가되는 스키마 버전(V2 등)을 허용한다.
+    out-of-order: true
 
 external:
   mock: ${EXTERNAL_MOCK:true}
   aerodatabox:
     api-key: ${AERODATABOX_API_KEY:}
+    api-host: ${AERODATABOX_API_HOST:aerodatabox.p.rapidapi.com}
+    base-url: https://aerodatabox.p.rapidapi.com
+    connect-timeout: 3s
+    read-timeout: 5s
   google:
     maps-api-key: ${GOOGLE_MAPS_API_KEY:}
 

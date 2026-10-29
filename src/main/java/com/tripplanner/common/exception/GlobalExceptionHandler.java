@@ -10,8 +10,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -60,6 +62,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleTypeMismatch(
             TypeMismatchException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         return validationFailed(List.of(error(ex.getPropertyName(), "허용되지 않는 값입니다.")));
+    }
+
+    /** 필수 @RequestParam 누락 (예: date 없음) */
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        return validationFailed(List.of(error(ex.getParameterName(), "필수 값입니다.")));
+    }
+
+    /** JSON 본문 해석 실패 (예: 잘못된 날짜·시각 형식, 깨진 JSON). 원인 메시지는 노출하지 않는다. */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        return validationFailed(List.of(error("body", "요청 본문을 해석할 수 없습니다.")));
     }
 
     private static ResponseEntity<Object> validationFailed(List<Map<String, String>> errors) {

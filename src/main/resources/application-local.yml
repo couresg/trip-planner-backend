@@ -1,4 +1,9 @@
 # 로컬 개발용. 값은 .env(환경변수)에서 주입한다.
+# 작업 디렉터리가 backend/ 이므로 상위 폴더의 .env를 properties 형식으로 읽는다. OS 환경변수가 있으면 그쪽이 우선한다.
+spring:
+  config:
+    import: optional:file:../.env[.properties]
+
 logging:
   level:
     com.tripplanner: DEBUG

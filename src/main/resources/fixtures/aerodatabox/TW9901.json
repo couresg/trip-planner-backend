@@ -1,0 +1,31 @@
+[
+  {
+    "number": "TW 9901",
+    "status": "Expected",
+    "departure": {
+      "airport": { "icao": "RJFF", "iata": "FUK", "name": "Fukuoka", "timeZone": "Asia/Tokyo" },
+      "scheduledTime": { "utc": "2026-11-05 01:30Z", "local": "2026-11-05 10:30+09:00" }
+    },
+    "arrival": {
+      "airport": { "icao": "RJBB", "iata": "KIX", "name": "Osaka Kansai", "timeZone": "Asia/Tokyo" },
+      "scheduledTime": { "utc": "2026-11-05 02:40Z", "local": "2026-11-05 11:40+09:00" },
+      "terminal": "1"
+    },
+    "airline": { "name": "T'way Air", "iata": "TW", "icao": "TWB" }
+  },
+  {
+    "number": "TW 9901",
+    "status": "Expected",
+    "departure": {
+      "airport": { "icao": "RKSI", "iata": "ICN", "name": "Seoul Incheon", "timeZone": "Asia/Seoul" },
+      "scheduledTime": { "utc": "2026-11-04 23:00Z", "local": "2026-11-05 08:00+09:00" },
+      "terminal": "1"
+    },
+    "arrival": {
+      "airport": { "icao": "RJFF", "iata": "FUK", "name": "Fukuoka", "timeZone": "Asia/Tokyo" },
+      "scheduledTime": { "utc": "2026-11-05 00:20Z", "local": "2026-11-05 09:20+09:00" },
+      "terminal": "I"
+    },
+    "airline": { "name": "T'way Air", "iata": "TW", "icao": "TWB" }
+  }
+]
