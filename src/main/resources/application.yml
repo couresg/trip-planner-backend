@@ -30,3 +30,9 @@ external:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+app:
+  transfer:
+    arrival-window-min: 120
+    immigration-options: 30, 60, 90
+    default-immigration-min: 60

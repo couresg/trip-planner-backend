@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -165,7 +166,14 @@ public class TripService {
         tripRepository.delete(findOwned(tripId, ownerToken));
     }
 
-    private Trip findOwned(String tripId, String ownerToken) {
+    /**
+     * 소유자 확인을 마친 여행 (city·area·flights 함께 로딩). 없는/형식 오류 ID 판정이 토큰 검증보다 먼저다.
+     * 여행 하위 리소스(교통편·일정) 서비스가 호출자 트랜잭션 안에서 쓴다.
+     *
+     * @throws BusinessException TRIP_NOT_FOUND, FORBIDDEN_TRIP
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Trip findOwned(String tripId, String ownerToken) {
         Trip trip = parseId(tripId)
                 .flatMap(tripRepository::findWithDetailsById)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND, "여행을 찾을 수 없습니다."));
