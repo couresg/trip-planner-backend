@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -56,7 +57,12 @@ public class DepartureTransferService {
     /** @throws com.tripplanner.common.exception.BusinessException TRIP_NOT_FOUND, FORBIDDEN_TRIP */
     @Transactional(readOnly = true)
     public DepartureTransferResponse departure(String tripId, String ownerToken, int airportBufferMin) {
-        Trip trip = tripService.findOwned(tripId, ownerToken);
+        return calculate(tripService.findOwned(tripId, ownerToken), airportBufferMin);
+    }
+
+    /** 소유자 확인을 마친 여행으로 계산한다. 일정 서비스가 호출자 트랜잭션 안에서 쓴다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public DepartureTransferResponse calculate(Trip trip, int airportBufferMin) {
         TripFlight returnFlight = trip.flight(FlightDirection.RETURN);
         Airport airport = TripAirports.find(airportRepository, trip, returnFlight.getDepAirportIata());
         ZoneId zone = ZoneId.of(airport.getTimezone());
