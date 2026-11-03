@@ -134,10 +134,10 @@ class ScheduleExpanderTest {
     }
 
     @Test
-    @DisplayName("요일 유형: 토요일은 SATURDAY, 일요일은 HOLIDAY, 나머지는 WEEKDAY")
+    @DisplayName("요일 유형: 토요일은 SATURDAY, 일요일과 공휴일(화 11-03 문화의 날)은 HOLIDAY, 나머지는 WEEKDAY")
     void dayTypeOf() {
         assertThat(IntStream.rangeClosed(2, 8).mapToObj(day -> DayType.of(at(day, 12, 0).toLocalDate())))
-                .containsExactly(DayType.WEEKDAY, DayType.WEEKDAY, DayType.WEEKDAY, DayType.WEEKDAY,
+                .containsExactly(DayType.WEEKDAY, DayType.HOLIDAY, DayType.WEEKDAY, DayType.WEEKDAY,
                         DayType.WEEKDAY, DayType.SATURDAY, DayType.HOLIDAY);
     }
 
