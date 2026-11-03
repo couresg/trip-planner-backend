@@ -91,6 +91,11 @@ public class Trip implements Persistable<UUID> {
                 .orElseThrow(() -> new IllegalStateException("여행 항공편 누락: " + direction));
     }
 
+    /** 날짜가 여행 기간(시작일~종료일, 양 끝 포함) 안인지 */
+    public boolean covers(LocalDate date) {
+        return !date.isBefore(startDate) && !date.isAfter(endDate);
+    }
+
     @PostLoad
     @PostPersist
     void markNotNew() {

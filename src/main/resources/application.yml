@@ -41,3 +41,6 @@ app:
     airport-buffer-options: 120, 150, 180
     default-airport-buffer-min: 120
     boarding-margin-min: 10
+  itinerary:
+    return-margin-min: 30
+    max-items-per-day: 200

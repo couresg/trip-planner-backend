@@ -184,6 +184,19 @@ public class TripService {
         return trip;
     }
 
+    /**
+     * findOwned와 같되 여행 행에 쓰기 잠금을 잡아 같은 여행의 변경을 직렬화한다.
+     * MySQL REPEATABLE READ는 첫 일반 조회 때 스냅샷을 잡으므로, 잠금을 트랜잭션의 첫 조회로 해야
+     * 앞선 트랜잭션이 커밋한 값을 읽는다. 호출자 트랜잭션에서 다른 조회보다 먼저 호출한다.
+     *
+     * @throws BusinessException TRIP_NOT_FOUND, FORBIDDEN_TRIP
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Trip findOwnedForUpdate(String tripId, String ownerToken) {
+        parseId(tripId).ifPresent(tripRepository::lockById);
+        return findOwned(tripId, ownerToken);
+    }
+
     private static Optional<UUID> parseId(String tripId) {
         try {
             return Optional.of(UUID.fromString(tripId));
