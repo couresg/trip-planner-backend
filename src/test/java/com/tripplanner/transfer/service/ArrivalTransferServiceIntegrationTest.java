@@ -21,7 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
-/** test 프로필(external.mock=true) + Testcontainers MySQL 시드(V100)로 노선·시각표 매핑과 도착일 교통편을 검증한다. */
+/** test 프로필(external.mock=true) + Testcontainers MySQL 시드(V100~V103)로 노선·시각표 매핑과 도착일 교통편을 검증한다. */
 @Tag("integration")
 @SpringBootTest
 @Import(MySqlContainerConfig.class)
@@ -64,5 +64,17 @@ class ArrivalTransferServiceIntegrationTest {
         Option taxi = response.options().getLast();
         assertThat(taxi.is24h()).isTrue();
         assertThat(taxi.fare().display()).isEqualTo("¥17,000~20,000");
+    }
+
+    @Test
+    @DisplayName("텐노지 여행에는 운휴로 비활성화한 107 리무진이 나오지 않고 106 열차와 111 택시가 남는다")
+    void tennojiWithoutSuspendedLimousine() {
+        CreateTripResponse trip = tripService.create(
+                new CreateTripRequest("KE723", "KE724", "OSA", 14L, START, START.plusDays(3), null));
+
+        ArrivalTransferResponse response = arrivalTransferService.arrival(trip.tripId(), trip.ownerToken(), 60);
+
+        assertThat(response.options()).extracting(Option::routeId).containsExactly(106L, 111L);
+        assertThat(response.noTransitWarning()).isFalse();
     }
 }
