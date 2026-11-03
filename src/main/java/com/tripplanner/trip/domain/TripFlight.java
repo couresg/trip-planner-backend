@@ -144,6 +144,11 @@ public class TripFlight {
         return revisedDepUtc != null ? revisedDepUtc : scheduledDepUtc;
     }
 
+    /** 귀국일 계산 기준 출발 시각: scheduled와 revised 중 이른 쪽. 저장된 지연은 갱신되지 않아 줄어들 수 있다. */
+    public Instant earliestDepartureAt() {
+        return revisedDepUtc != null && revisedDepUtc.isBefore(scheduledDepUtc) ? revisedDepUtc : scheduledDepUtc;
+    }
+
     public Long getId() {
         return id;
     }

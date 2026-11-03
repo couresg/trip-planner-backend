@@ -36,3 +36,8 @@ app:
     arrival-window-min: 120
     immigration-options: 30, 60, 90
     default-immigration-min: 60
+    departure-window-min: 90
+    departure-lookback-min: 240
+    airport-buffer-options: 120, 150, 180
+    default-airport-buffer-min: 120
+    boarding-margin-min: 10

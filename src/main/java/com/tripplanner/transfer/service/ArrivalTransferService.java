@@ -59,7 +59,7 @@ public class ArrivalTransferService {
     public ArrivalTransferResponse arrival(String tripId, String ownerToken, int immigrationMin) {
         Trip trip = tripService.findOwned(tripId, ownerToken);
         TripFlight outbound = trip.flight(FlightDirection.OUTBOUND);
-        Airport airport = arrivalAirport(trip, outbound);
+        Airport airport = TripAirports.find(airportRepository, trip, outbound.getArrAirportIata());
         ZoneId zone = ZoneId.of(airport.getTimezone());
 
         ZonedDateTime base = outbound.arrivalAt().atZone(zone);
@@ -89,15 +89,6 @@ public class ArrivalTransferService {
         return new ArrivalTransferResponse(base.toOffsetDateTime(), base.toOffsetDateTime(),
                 windowEnd.toOffsetDateTime(), readyAt.toOffsetDateTime(), zone.getId(), !anyTransitAvailable,
                 options);
-    }
-
-    /** 가는 편 도착 공항 (여행 생성 시 도시 공항임을 검증했다). */
-    private Airport arrivalAirport(Trip trip, TripFlight outbound) {
-        return airportRepository.findAllByCityIdInOrderByIataAsc(List.of(trip.getCity().getId())).stream()
-                .filter(a -> a.getIata().equals(outbound.getArrAirportIata()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "여행 도시에 가는 편 도착 공항이 없음: " + outbound.getArrAirportIata()));
     }
 
     private RankedOption transit(TransportRoute route, ZonedDateTime windowStart, ZonedDateTime windowEnd,
