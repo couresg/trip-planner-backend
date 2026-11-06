@@ -66,6 +66,7 @@ public class DepartureTransferService {
         TripFlight returnFlight = trip.flight(FlightDirection.RETURN);
         Airport airport = TripAirports.find(airportRepository, trip, returnFlight.getDepAirportIata());
         ZoneId zone = ZoneId.of(airport.getTimezone());
+        String countryCode = trip.getCity().getCountryCode();
         Instant landedAt = trip.flight(FlightDirection.OUTBOUND).arrivalAt();
 
         ZonedDateTime flightDeparture = returnFlight.earliestDepartureAt().atZone(zone);
@@ -78,7 +79,7 @@ public class DepartureTransferService {
                 airport.getId(), trip.getArea().getId(), RouteDirection.AREA_TO_AIRPORT)) {
             ranked.add(route.getMode().isOnDemand()
                     ? onDemand(route, deadline, landedAt)
-                    : transit(route, lookbackStart, windowStart, deadline, landedAt));
+                    : transit(route, countryCode, lookbackStart, windowStart, deadline, landedAt));
         }
         List<Option> options = ranked.stream()
                 .sorted(Comparator.comparing(RankedOption::onDemand)
@@ -112,16 +113,16 @@ public class DepartureTransferService {
                 : null;
     }
 
-    private RankedOption transit(TransportRoute route, ZonedDateTime lookbackStart, ZonedDateTime windowStart,
-            ZonedDateTime deadline, Instant landedAt) {
+    private RankedOption transit(TransportRoute route, String countryCode, ZonedDateTime lookbackStart,
+            ZonedDateTime windowStart, ZonedDateTime deadline, Instant landedAt) {
         Schedule schedule = route.schedule();
         int rideMin = route.getDurationMin();
-        List<ZonedDateTime> inWindow = afterLanding(route, scheduleExpander.departures(schedule,
+        List<ZonedDateTime> inWindow = afterLanding(route, scheduleExpander.departures(countryCode, schedule,
                 windowStart.minusMinutes(rideMin), deadline.minusMinutes(rideMin)), landedAt);
         List<Departure> departures = new ArrayList<>();
         if (inWindow.isEmpty()) {
             // 착륙 전 제외 전에도 window가 비었다면 도착이 windowStart와 같은 편은 없고, 제외로 비었다면 되돌아보기 편도 모두 착륙 전이다.
-            List<ZonedDateTime> earlier = afterLanding(route, scheduleExpander.departures(schedule,
+            List<ZonedDateTime> earlier = afterLanding(route, scheduleExpander.departures(countryCode, schedule,
                     lookbackStart.minusMinutes(rideMin), windowStart.minusMinutes(rideMin)), landedAt);
             if (!earlier.isEmpty()) {
                 departures.add(departure(route, earlier.getLast(), DepartureLabel.LATEST, true));

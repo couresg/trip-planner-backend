@@ -36,12 +36,16 @@ class CatalogServiceIntegrationTest {
     PlaceService placeService;
 
     @Test
-    @DisplayName("도시 목록에 오사카와 간사이 국제공항이 포함된다")
+    @DisplayName("도시 목록은 오사카(KIX)·도쿄(HND·NRT)·후쿠오카(FUK) 순이다")
     void cities() {
         List<CityResponse> cities = catalogService.getCities();
 
-        assertThat(cities).containsExactly(new CityResponse("OSA", "오사카", "JP", "Asia/Tokyo",
-                List.of(new AirportSummary("KIX", "간사이 국제공항"))));
+        assertThat(cities).containsExactly(
+                new CityResponse("OSA", "오사카", "JP", "Asia/Tokyo", List.of(new AirportSummary("KIX", "간사이 국제공항"))),
+                new CityResponse("TYO", "도쿄", "JP", "Asia/Tokyo", List.of(new AirportSummary("HND", "하네다 공항"),
+                        new AirportSummary("NRT", "나리타 국제공항"))),
+                new CityResponse("FUK", "후쿠오카", "JP", "Asia/Tokyo",
+                        List.of(new AirportSummary("FUK", "후쿠오카 공항"))));
     }
 
     @Test
@@ -57,11 +61,11 @@ class CatalogServiceIntegrationTest {
     @Test
     @DisplayName("시드되지 않은 도시 코드는 CITY_NOT_FOUND 예외를 던진다")
     void unknownCity() {
-        assertThatThrownBy(() -> catalogService.getAreas("TYO"))
+        assertThatThrownBy(() -> catalogService.getAreas("SEL"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).errorCode())
                 .isEqualTo(ErrorCode.CITY_NOT_FOUND);
-        assertThatThrownBy(() -> placeService.getPlaces("TYO", null, null))
+        assertThatThrownBy(() -> placeService.getPlaces("SEL", null, null))
                 .isInstanceOf(BusinessException.class);
     }
 

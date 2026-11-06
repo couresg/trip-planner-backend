@@ -44,13 +44,13 @@ class CatalogRepositoryIntegrationTest {
     JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("활성 도시로 오사카(OSA, Asia/Tokyo)가 시드되어 있다")
+    @DisplayName("활성 도시로 오사카·도쿄·후쿠오카(모두 Asia/Tokyo)가 ID 순으로 시드되어 있다")
     void activeCities() {
         List<City> cities = cityRepository.findAllByActiveTrueOrderByIdAsc();
 
-        assertThat(cities).extracting(City::getCode).containsExactly("OSA");
-        assertThat(cities.getFirst().getTimezone()).isEqualTo("Asia/Tokyo");
-        assertThat(cityRepository.findByCodeAndActiveTrue("TYO")).isEmpty();
+        assertThat(cities).extracting(City::getCode).containsExactly("OSA", "TYO", "FUK");
+        assertThat(cities).extracting(City::getTimezone).containsOnly("Asia/Tokyo");
+        assertThat(cityRepository.findByCodeAndActiveTrue("SEL")).isEmpty();
     }
 
     @Test
@@ -136,16 +136,23 @@ class CatalogRepositoryIntegrationTest {
                 "난바:AIRPORT_TO_AREA", "난바:AREA_TO_AIRPORT",
                 "우메다:AIRPORT_TO_AREA", "우메다:AREA_TO_AIRPORT",
                 "신오사카:AIRPORT_TO_AREA", "신오사카:AREA_TO_AIRPORT",
-                "텐노지:AIRPORT_TO_AREA", "텐노지:AREA_TO_AIRPORT");
+                "텐노지:AIRPORT_TO_AREA", "텐노지:AREA_TO_AIRPORT",
+                "신주쿠:AIRPORT_TO_AREA", "신주쿠:AREA_TO_AIRPORT",
+                "시부야:AIRPORT_TO_AREA", "시부야:AREA_TO_AIRPORT",
+                "도쿄역·긴자:AIRPORT_TO_AREA", "도쿄역·긴자:AREA_TO_AIRPORT",
+                "우에노·아사쿠사:AIRPORT_TO_AREA", "우에노·아사쿠사:AREA_TO_AIRPORT",
+                "하카타:AIRPORT_TO_AREA", "하카타:AREA_TO_AIRPORT",
+                "텐진:AIRPORT_TO_AREA", "텐진:AREA_TO_AIRPORT",
+                "나카스:AIRPORT_TO_AREA", "나카스:AREA_TO_AIRPORT");
         assertThat(missingSource).isZero();
     }
 
     @Test
-    @DisplayName("TIMETABLE 노선은 요일 유형별 시각표가 있고, HEADWAY 노선은 첫차·막차·간격이 있다")
+    @DisplayName("활성 TIMETABLE 노선은 요일 유형별 시각표가 있고, HEADWAY 노선은 첫차·막차·간격이 있다 (시각표를 못 구한 노선은 비활성)")
     void schedulesMatchScheduleType() {
         Integer timetableWithoutRows = jdbcTemplate.queryForObject("""
                 select count(*) from transport_route r
-                where r.schedule_type = 'TIMETABLE'
+                where r.schedule_type = 'TIMETABLE' and r.active = true
                   and (select count(distinct t.day_type) from transport_timetable t where t.route_id = r.id) <> 3
                 """, Integer.class);
         Integer headwayWithoutFields = jdbcTemplate.queryForObject("""

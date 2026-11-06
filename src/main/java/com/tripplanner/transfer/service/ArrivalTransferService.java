@@ -67,6 +67,7 @@ public class ArrivalTransferService {
         TripFlight outbound = trip.flight(FlightDirection.OUTBOUND);
         Airport airport = TripAirports.find(airportRepository, trip, outbound.getArrAirportIata());
         ZoneId zone = ZoneId.of(airport.getTimezone());
+        String countryCode = trip.getCity().getCountryCode();
 
         ZonedDateTime base = outbound.arrivalAt().atZone(zone);
         ZonedDateTime windowEnd = base.plusMinutes(properties.arrivalWindowMin());
@@ -80,7 +81,7 @@ public class ArrivalTransferService {
                 ranked.add(onDemand(route));
                 continue;
             }
-            RankedOption option = transit(route, base, windowEnd, readyAt);
+            RankedOption option = transit(route, countryCode, base, windowEnd, readyAt);
             anyTransitAvailable |= option.recommendedArrival() != null;
             ranked.add(option);
         }
@@ -97,13 +98,13 @@ public class ArrivalTransferService {
                 options);
     }
 
-    private RankedOption transit(TransportRoute route, ZonedDateTime windowStart, ZonedDateTime windowEnd,
-            ZonedDateTime readyAt) {
+    private RankedOption transit(TransportRoute route, String countryCode, ZonedDateTime windowStart,
+            ZonedDateTime windowEnd, ZonedDateTime readyAt) {
         Schedule schedule = route.schedule();
         int toAreaMin = route.getDurationMin() + route.getWalkMin();
         List<Departure> departures = new ArrayList<>();
         Instant recommendedArrival = null;
-        for (ZonedDateTime dep : scheduleExpander.departures(schedule, windowStart, windowEnd)) {
+        for (ZonedDateTime dep : scheduleExpander.departures(countryCode, schedule, windowStart, windowEnd)) {
             ZonedDateTime arriveAreaAt = dep.plusMinutes(toAreaMin);
             boolean available = !dep.isBefore(readyAt);
             boolean recommended = available && recommendedArrival == null;
@@ -114,7 +115,7 @@ public class ArrivalTransferService {
                     available ? DepartureStatus.AVAILABLE : DepartureStatus.HARD_TO_CATCH, recommended));
         }
         ZonedDateTime nextFirst = recommendedArrival == null
-                ? scheduleExpander.nextDepartureFrom(schedule, readyAt).orElse(null)
+                ? scheduleExpander.nextDepartureFrom(countryCode, schedule, readyAt).orElse(null)
                 : null;
         return new RankedOption(option(route, departures, nextFirst), false, recommendedArrival);
     }

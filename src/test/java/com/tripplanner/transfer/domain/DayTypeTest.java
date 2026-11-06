@@ -9,23 +9,16 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 class DayTypeTest {
 
-    @ParameterizedTest(name = "{0} = {1}")
-    @DisplayName("평일에 걸린 공휴일·대체 휴일·국민의 휴일은 HOLIDAY이고, 그 밖의 날은 요일로 판정한다")
+    @ParameterizedTest(name = "{0} holiday={1} = {2}")
+    @DisplayName("공휴일이면 요일과 상관없이 HOLIDAY이고, 아니면 토요일 SATURDAY, 일요일 HOLIDAY, 나머지 WEEKDAY다")
     @CsvSource({
-            "2026-11-23, HOLIDAY", // 월요일 근로감사의 날
-            "2026-05-06, HOLIDAY", // 수요일 대체 휴일
-            "2026-09-22, HOLIDAY", // 화요일 국민의 휴일
-            "2027-03-22, HOLIDAY", // 월요일 대체 휴일
-            "2027-11-23, HOLIDAY", // 목록 마지막 날
-            "2026-11-24, WEEKDAY", // 공휴일 다음 날
-            "2026-11-07, SATURDAY",
-            "2026-11-08, HOLIDAY",
-            "2025-11-24, WEEKDAY", // 목록 밖: 실제 대체 휴일이지만 2025는 목록에 없다
-            "2028-11-23, WEEKDAY", // 목록 밖: 목요일 공휴일이지만 2028은 목록에 없다
-            "2028-11-25, SATURDAY",
-            "2028-11-26, HOLIDAY"
+            "2026-11-23, true, HOLIDAY", // 월요일 공휴일
+            "2026-11-24, false, WEEKDAY",
+            "2026-11-07, false, SATURDAY",
+            "2026-11-07, true, HOLIDAY", // 토요일 공휴일
+            "2026-11-08, false, HOLIDAY"
     })
-    void of(LocalDate date, DayType expected) {
-        assertThat(DayType.of(date)).isEqualTo(expected);
+    void of(LocalDate date, boolean holiday, DayType expected) {
+        assertThat(DayType.of(date, holiday)).isEqualTo(expected);
     }
 }

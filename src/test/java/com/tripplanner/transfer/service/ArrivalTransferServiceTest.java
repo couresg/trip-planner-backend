@@ -69,6 +69,7 @@ class ArrivalTransferServiceTest {
     void setUp() {
         osaka = mock(City.class);
         given(osaka.getId()).willReturn(1L);
+        given(osaka.getCountryCode()).willReturn("JP");
         namba = mock(Area.class);
         given(namba.getId()).willReturn(11L);
         Airport kix = mock(Airport.class);
@@ -79,7 +80,7 @@ class ArrivalTransferServiceTest {
         given(routeRepository.findAllByAirportIdAndAreaIdAndDirectionAndActiveTrueOrderByIdAsc(1L, 11L,
                 RouteDirection.AIRPORT_TO_AREA)).willReturn(routes);
         service = new ArrivalTransferService(tripService, airportRepository, routeRepository,
-                new ScheduleExpander(), TransferProperties.defaults());
+                new ScheduleExpander(TestHolidayCalendars.japan2026()), TransferProperties.defaults());
     }
 
     @Test

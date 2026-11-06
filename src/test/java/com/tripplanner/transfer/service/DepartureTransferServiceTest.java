@@ -72,6 +72,7 @@ class DepartureTransferServiceTest {
     void setUp() {
         osaka = mock(City.class);
         given(osaka.getId()).willReturn(1L);
+        given(osaka.getCountryCode()).willReturn("JP");
         namba = mock(Area.class);
         given(namba.getId()).willReturn(11L);
         Airport kix = mock(Airport.class);
@@ -82,7 +83,7 @@ class DepartureTransferServiceTest {
         given(routeRepository.findAllByAirportIdAndAreaIdAndDirectionAndActiveTrueOrderByIdAsc(1L, 11L,
                 RouteDirection.AREA_TO_AIRPORT)).willReturn(routes);
         service = new DepartureTransferService(tripService, airportRepository, routeRepository,
-                new ScheduleExpander(), TransferProperties.defaults());
+                new ScheduleExpander(TestHolidayCalendars.japan2026()), TransferProperties.defaults());
     }
 
     @Test
@@ -397,7 +398,7 @@ class DepartureTransferServiceTest {
     }
 
     @Test
-    @DisplayName("공휴일 목록 밖인 해(2028)의 목요일 공휴일은 평일 시각표를 쓴다")
+    @DisplayName("공휴일 데이터가 없는 해(2028)의 목요일 공휴일은 평일 시각표를 쓴다")
     void holidayOutsideListUsesWeekdayTimetable() {
         addExpressRoute();
         departAt(ZonedDateTime.of(2028, 11, 24, 5, 0, 0, 0, TOKYO));
