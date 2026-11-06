@@ -1,0 +1,7 @@
+# 테스트 클래스패스 전용. classpath:/config/application.yml은 main의 application.yml 위에 덮어쓰기로 합쳐진다.
+# @WebMvcTest처럼 test 프로필을 쓰지 않는 테스트도 기존 테스트가 요청 한도에 걸리지 않도록 한도만 높인다.
+# 요청 제한 전용 테스트는 properties로 작은 값을 따로 준다.
+app:
+  rate-limit:
+    general-per-minute: 100000
+    external-per-minute: 100000

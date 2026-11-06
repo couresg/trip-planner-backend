@@ -44,3 +44,9 @@ app:
   itinerary:
     return-margin-min: 30
     max-items-per-day: 200
+  # IP(remoteAddr) 기준. external은 GET /flights/lookup·POST /trips에 general과 함께 적용된다.
+  rate-limit:
+    enabled: true
+    general-per-minute: 120
+    external-per-minute: 20
+    cache-max-size: 100000
