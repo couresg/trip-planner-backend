@@ -20,8 +20,10 @@ import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -32,7 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 확인 시각(fetched_at)은 요청 시각이 아니라 그 값을 공급자에서 받은 시각이고, 더 나중에 받은 값만 저장한다.
  *
  * <p>순서: 읽기 트랜잭션(소유자 확인 + 스냅샷) → 트랜잭션 밖 FlightService 조회(캐시) → 짧은 쓰기 트랜잭션(행 잠금 후 갱신).
- * 외부 호출 동안 DB 커넥션·잠금을 잡지 않는다. 조회 실패는 요청을 실패시키지 않고 FAILED로 돌려준다.
+ * 외부 호출 동안 DB 커넥션·잠금을 잡지 않는다. 조회 실패와 갱신(쓰기) 실패는 요청을 실패시키지 않고 FAILED로 돌려준다.
  */
 @Service
 public class FlightRefreshService {
@@ -89,7 +91,14 @@ public class FlightRefreshService {
             }
         }
         if (!fetched.isEmpty()) {
-            writeTx.executeWithoutResult(status -> fetched.values().forEach(this::apply));
+            try {
+                writeTx.executeWithoutResult(status -> fetched.values().forEach(this::apply));
+            } catch (DataAccessException | TransactionException e) {
+                // 잠금 대기 초과·교착·일시적 DB 오류. 쓰기는 한 트랜잭션이라 전부 되돌려지므로 저장된 값으로 계산을 계속한다.
+                log.warn("저장된 항공편 갱신 실패: tripId={}, directions={}, error={}", tripId, fetched.keySet(),
+                        e.getClass().getSimpleName());
+                fetched.keySet().forEach(direction -> results.put(direction, FlightCheckResult.FAILED));
+            }
         }
         return new FlightRefresh(results);
     }

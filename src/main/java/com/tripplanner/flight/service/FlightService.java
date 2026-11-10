@@ -129,7 +129,7 @@ public class FlightService {
             return orNotFound(cached);
         }
 
-        Optional<FlightCacheEntry> row = cacheRepository.findByFlightNoAndFlightDate(key.flightNo(), key.date());
+        Optional<FlightCacheEntry> row = findRow(key);
         if (row.isPresent() && row.get().isFresh(now)) {
             Optional<List<FlightLeg>> legs = read(row.get());
             if (legs.isPresent()) {
@@ -200,6 +200,17 @@ public class FlightService {
                 .orElseThrow(() -> cause != null
                 ? cause
                 : new FlightProviderException("공급자 장애 후 대기 중", null));
+    }
+
+    /** DB 캐시를 읽지 못하면 캐시가 없는 것으로 보고 공급자 조회로 넘어간다 (캐시 장애가 조회 실패가 되지 않게). */
+    private Optional<FlightCacheEntry> findRow(CacheKey key) {
+        try {
+            return cacheRepository.findByFlightNoAndFlightDate(key.flightNo(), key.date());
+        } catch (DataAccessException e) {
+            log.warn("flight_cache 조회 실패: flightNo={}, date={}, error={}", key.flightNo(), key.date(),
+                    e.getClass().getSimpleName());
+            return Optional.empty();
+        }
     }
 
     private void save(Optional<FlightCacheEntry> row, CacheKey key, List<FlightLeg> legs, Instant now,

@@ -38,6 +38,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -239,6 +240,20 @@ class FlightRefreshServiceTest {
         assertThat(outbound.refresh(outboundLeg(OUT_ARR.plusMinutes(10), "Delayed"), newer)).isFalse();
         assertThat(outbound.arrivalAt()).isEqualTo(OUT_ARR.plusMinutes(30).toInstant());
         assertThat(outbound.refresh(outboundLeg(OUT_ARR.plusMinutes(10), "Delayed"), newer.plusSeconds(1))).isTrue();
+    }
+
+    @Test
+    @DisplayName("갱신 중 잠금 대기 초과 같은 DB 오류가 나면 요청을 실패시키지 않고 FAILED로 돌려준다")
+    void writeFailureDoesNotFailRequest() {
+        Instant now = OUT_DEP.minusHours(3).toInstant();
+        stub(KE723, START, fresh(now, outboundLeg(OUT_ARR.plusMinutes(50), "Delayed")));
+        given(tripFlightRepository.lockById(1L)).willThrow(new CannotAcquireLockException("lock wait timeout"));
+
+        FlightRefresh refresh = service(now).refresh(TRIP_ID, TOKEN, OUT);
+
+        assertThat(refresh.of(FlightDirection.OUTBOUND)).isEqualTo(FlightCheckResult.FAILED);
+        assertThat(outbound.arrivalAt()).isEqualTo(OUT_ARR.toInstant());
+        assertThat(outbound.getFetchedAt()).isEqualTo(CREATED);
     }
 
     @Test

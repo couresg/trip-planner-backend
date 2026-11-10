@@ -110,6 +110,16 @@ class FlightServiceTest {
     }
 
     @Test
+    @DisplayName("DB 캐시 조회가 실패하면 캐시가 없는 것으로 보고 공급자 값을 돌려준다")
+    void dbReadFailureFallsBackToProvider() {
+        given(repository.findByFlightNoAndFlightDate("KE723", DATE))
+                .willThrow(new DataAccessResourceFailureException("connection lost"));
+
+        assertThat(service.lookup(KE723, DATE)).containsExactly(ke723());
+        assertThat(client.calls.get()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("DB 캐시가 만료되었으면 공급자를 호출하고 같은 행을 갱신한다")
     void dbExpiredRefreshesRow() {
         FlightCacheEntry expired = entry(clock.instant());
