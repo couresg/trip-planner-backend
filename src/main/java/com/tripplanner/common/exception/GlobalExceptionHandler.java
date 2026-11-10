@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -76,6 +77,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         return validationFailed(List.of(error("body", "요청 본문을 해석할 수 없습니다.")));
+    }
+
+    /**
+     * 위에서 따로 처리하지 않은 프레임워크 오류(없는 경로 404, 405, 415 등)에도 code를 넣는다.
+     * code는 HTTP 상태 이름(예: METHOD_NOT_ALLOWED)이고 5xx는 INTERNAL_ERROR다.
+     */
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(
+            Exception ex, Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
+        ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        if (response != null && response.getBody() instanceof ProblemDetail pd
+                && (pd.getProperties() == null || !pd.getProperties().containsKey("code"))) {
+            HttpStatus status = HttpStatus.resolve(pd.getStatus());
+            String code = status == null || status.is5xxServerError() ? ErrorCode.INTERNAL_ERROR.name()
+                    : status.name();
+            pd.setType(URI.create(TYPE_BASE + code));
+            pd.setProperty("code", code);
+        }
+        return response;
     }
 
     private static ResponseEntity<Object> validationFailed(List<Map<String, String>> errors) {

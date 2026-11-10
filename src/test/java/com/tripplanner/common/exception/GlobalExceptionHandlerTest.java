@@ -60,6 +60,19 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().string(not(containsString("secret-internal-detail"))));
     }
 
+    @Test
+    @DisplayName("프레임워크가 내는 405·415에도 HTTP 상태 이름의 code가 들어간다")
+    void frameworkErrorsCarryCode() throws Exception {
+        mockMvc.perform(post("/test/business"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+        mockMvc.perform(post("/test/validate")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("name"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
     @RestController
     static class ThrowingController {
 
