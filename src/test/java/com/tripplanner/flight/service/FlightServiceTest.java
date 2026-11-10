@@ -181,6 +181,17 @@ class FlightServiceTest {
     }
 
     @Test
+    @DisplayName("fetchedAt은 DB DATETIME(6)과 같게 마이크로초로 자른다 (같은 값 재기록 생략 비교가 성립하도록)")
+    void fetchedAtTruncatedToMicros() {
+        clock.set(Instant.parse("2026-10-29T00:00:00.123456789Z"));
+
+        FlightService.FlightLookup lookup = service.lookupWithMeta(KE723, DATE);
+
+        assertThat(lookup.fetchedAt()).isEqualTo(Instant.parse("2026-10-29T00:00:00.123456Z"));
+        assertThat(savedEntry().getFetchedAt()).isEqualTo(lookup.fetchedAt());
+    }
+
+    @Test
     @DisplayName("공급자 장애로 만료된 DB 캐시를 대신 주면 stale이고 fetchedAt은 그 행을 받은 시각이다")
     void staleFallbackIsMarked() {
         FlightCacheEntry row = entry(clock.instant().minus(Duration.ofDays(1)));

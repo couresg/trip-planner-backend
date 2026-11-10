@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -121,7 +122,8 @@ public class FlightService {
 
     /** 키별로 한 요청만 실행한다. */
     private FlightLookup load(FlightNumber flightNumber, CacheKey key) {
-        Instant now = clock.instant();
+        // DATETIME(6)과 같은 정밀도로 맞춰야 저장된 fetched_at과 캐시의 fetchedAt이 같다고 비교된다.
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         CachedLegs cached = memory.getIfPresent(key);
         if (cached != null && cached.isFresh(now)) {
             return orNotFound(cached);
