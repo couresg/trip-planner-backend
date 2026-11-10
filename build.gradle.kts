@@ -37,6 +37,11 @@ dependencies {
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// 에이전트 도구가 리소스 폴더에 남긴 로컬 상태(.omc)가 jar에 들어가지 않게 한다.
+tasks.processResources {
+	exclude("**/.omc/**")
+}
+
 // 기본 테스트는 Docker/DB 없이 실행한다.
 // Testcontainers가 필요한 테스트는 @Tag("integration")을 붙이고 integrationTest로 실행한다.
 tasks.test {
