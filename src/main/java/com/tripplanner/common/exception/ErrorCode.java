@@ -18,6 +18,7 @@ public enum ErrorCode {
     ITINERARY_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "일정 항목을 찾을 수 없음"),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청 한도 초과"),
     FLIGHT_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "외부 항공 API 장애"),
+    RECOMMENDATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "장소 추천기 장애"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류");
 
     private final HttpStatus status;

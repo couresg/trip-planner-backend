@@ -55,6 +55,7 @@ docker compose up -d mysql
 |---|---|
 | `app.transfer.*` | 도착/출발 시간 계산 옵션 (도착 조회 창 120분, 입국 소요 30/60/90분, 공항 도착 여유 120/150/180분 등) |
 | `app.itinerary.*` | 일정 규칙 (`return-margin-min`, `max-items-per-day`) |
+| `app.recommend.*` | 장소 추천 (`provider`: `mock`만 구현, `cache-ttl` 1h, `cache-max-size` 1000) |
 | `app.cors.allowed-origins` | CORS 허용 origin (`local` 프로파일) |
 | `app.rate-limit.*` | 요청 횟수 제한 (아래) |
 
@@ -66,7 +67,7 @@ docker compose up -d mysql
 |---|---|---|
 | `enabled` | `true` | 전체 on/off |
 | `general-per-minute` | 120 | 모든 `/api/v1` 호출 |
-| `external-per-minute` | 20 | `GET /api/v1/flights/lookup`, `POST /api/v1/trips` (일반 한도도 함께 소모) |
+| `external-per-minute` | 20 | `GET /api/v1/flights/lookup`, `POST /api/v1/trips`, `GET /api/v1/trips/{tripId}/recommendations/places` (일반 한도도 함께 소모) |
 | `cache-max-size` | 100000 | IP별 버킷을 보관하는 최대 개수 |
 
 초과 시 `429` + 코드 `RATE_LIMITED`(ProblemDetail) + `Retry-After`(초) 헤더. `X-Forwarded-For`는 신뢰하지 않고 `getRemoteAddr()`를 쓴다.
@@ -79,4 +80,4 @@ docker compose up -d mysql
 
 ## 구조
 
-`com.tripplanner` 아래 `common`, `catalog`, `flight`, `trip`, `transfer`, `place`, `itinerary` 패키지 (도메인 우선). 자세한 규칙은 `CLAUDE.md`.
+`com.tripplanner` 아래 `common`, `catalog`, `flight`, `trip`, `transfer`, `place`, `itinerary`, `recommend` 패키지 (도메인 우선). 자세한 규칙은 `CLAUDE.md`.

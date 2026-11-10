@@ -38,7 +38,8 @@ com.tripplanner
 ├── trip/          # Trip, TripFlight, TripService, TripController, OwnerTokenService
 ├── transfer/      # TransportRoute, Timetable, ScheduleExpander, ArrivalTransferService, DepartureTransferService
 ├── place/         # Place, PlaceService
-└── itinerary/     # ItineraryItem, ItineraryService, ItineraryWarningCalculator
+├── itinerary/     # ItineraryItem, ItineraryService, ItineraryWarningCalculator
+└── recommend/     # Pace, PlaceRecommender(+Mock, app.recommend.provider), PlaceRecommendationService(결과 검증·캐시)
 ```
 
 각 도메인 내부: `domain/`(엔티티·값 객체), `repository/`, `service/`, `api/`(컨트롤러 + DTO), `client/`(외부 연동 시).

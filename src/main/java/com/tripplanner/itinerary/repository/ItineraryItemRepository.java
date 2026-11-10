@@ -20,6 +20,10 @@ public interface ItineraryItemRepository extends JpaRepository<ItineraryItem, Lo
     @EntityGraph(attributePaths = "place")
     Optional<ItineraryItem> findByIdAndTrip(Long id, Trip trip);
 
+    /** 여행 일정에 들어 있는 장소 ID (날짜 무관, 중복 없음) */
+    @Query("select distinct i.place.id from ItineraryItem i where i.trip = :trip")
+    List<Long> findPlaceIdsByTrip(@Param("trip") Trip trip);
+
     /** 날짜에 항목이 없으면 -1 */
     @Query("""
             select coalesce(max(i.position), -1) from ItineraryItem i

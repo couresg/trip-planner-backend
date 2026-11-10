@@ -39,7 +39,7 @@ public class PlaceService {
                 .toList();
     }
 
-    private PlaceResponse toResponse(Place p) {
+    public PlaceResponse toResponse(Place p) {
         return new PlaceResponse(p.getId(), p.getNameKo(), p.getCategory(), p.getLat().doubleValue(),
                 p.getLng().doubleValue(), objectMapper.readValue(p.getOpeningHoursJson(), OPENING_HOURS_TYPE),
                 p.isAlwaysOpen(), p.getDurationMin(), p.getSummary());
