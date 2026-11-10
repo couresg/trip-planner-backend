@@ -136,12 +136,13 @@ public class TripFlight {
 
     /**
      * 재조회한 구간으로 시각·터미널·status를 덮어쓰고 fetchedAt을 checkedAt으로 바꾼다.
-     * 수동 입력 편이거나 저장된 값이 checkedAt보다 나중에 받은 값이면 바꾸지 않는다 (동시 요청의 오래된 값 방지).
+     * checkedAt은 그 값을 공급자에서 받은 시각이다. 수동 입력 편이거나 저장된 값이 checkedAt과 같거나 나중에 받은 값이면
+     * 바꾸지 않는다 (같은 캐시 값 재기록·동시 요청의 오래된 값 방지).
      *
      * @return 갱신했으면 true
      */
     public boolean refresh(FlightLeg leg, Instant checkedAt) {
-        if (source == FlightSource.MANUAL || checkedAt.isBefore(fetchedAt)) {
+        if (source == FlightSource.MANUAL || !checkedAt.isAfter(fetchedAt)) {
             return false;
         }
         FlightPoint dep = leg.departure();

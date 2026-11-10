@@ -87,7 +87,7 @@ class FlightRefreshIntegrationTest {
 
         arrival(trip)
                 .andExpect(jsonPath("$.baseTime").value("2031-05-09T23:30:00+09:00"))
-                .andExpect(jsonPath("$.flightCheck.result").value("OUT_OF_WINDOW"))
+                .andExpect(jsonPath("$.flightCheck.result").value("BEFORE_WINDOW"))
                 .andExpect(jsonPath("$.flightCheck.checkedAt").value("2031-05-01T09:00:00+09:00"));
         verify(flightClient, times(1)).findLegs(FlightNumber.of("KE723"), start);
 
@@ -115,7 +115,7 @@ class FlightRefreshIntegrationTest {
     }
 
     @Test
-    @DisplayName("공급자 장애면 귀국일·일정은 저장된 값으로 200 응답하고 귀국일은 FAILED와 마지막 확인 시각을 준다")
+    @DisplayName("만료된 캐시만 있는 공급자 장애면 귀국일·일정은 저장된 값으로 200 응답하고 귀국일은 FAILED와 마지막 확인 시각을 준다")
     void providerFailureFallsBackToStoredValues() throws Exception {
         LocalDate start = LocalDate.of(2031, 4, 4);
         LocalDate end = start.plusDays(3);
@@ -125,9 +125,9 @@ class FlightRefreshIntegrationTest {
         stubReturn(end, null);
         CreateTripResponse trip = create(start);
 
-        // 오는 편 출발 3시간 전: 가는 편은 구간 밖, 오는 편만 조회한다. 만료된 DB 캐시 대체가 없도록 지운다.
+        // 오는 편 출발 3시간 전: 가는 편은 구간이 지났고 오는 편만 조회한다. 공급자 장애라 FlightService는
+        // 만료된 DB 캐시(생성 때 값)를 대신 주지만 새 정보가 아니므로 FAILED다.
         CLOCK.set(ZonedDateTime.of(2031, 4, 7, 15, 0, 0, 0, TOKYO).toInstant());
-        jdbcTemplate.update("DELETE FROM flight_cache WHERE flight_no = ? AND flight_date = ?", "KE724", end);
         willThrow(new FlightProviderException("timeout", null)).given(flightClient)
                 .findLegs(FlightNumber.of("KE724"), end);
 
@@ -138,6 +138,30 @@ class FlightRefreshIntegrationTest {
                 .andExpect(jsonPath("$.flightCheck.result").value("FAILED"))
                 .andExpect(jsonPath("$.flightCheck.checkedAt").value("2031-03-20T09:00:00+09:00"));
         call("/itinerary", trip).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("재조회로 오는 편이 18:00 → 19:30으로 늦어져도 귀국일 기준 출발은 예정 18:00 그대로이고 지연은 안내만 한다")
+    void lateRevisedReturnKeepsScheduledBase() throws Exception {
+        LocalDate start = LocalDate.of(2031, 6, 6);
+        LocalDate end = start.plusDays(3);
+        CLOCK.set(Instant.parse("2031-05-25T00:00:00Z"));
+        stubOutbound(start, ZonedDateTime.of(2031, 6, 6, 12, 0, 0, 0, SEOUL),
+                ZonedDateTime.of(2031, 6, 6, 14, 10, 0, 0, TOKYO), null, "Expected");
+        stubReturn(end, null);
+        CreateTripResponse trip = create(start);
+
+        CLOCK.set(ZonedDateTime.of(2031, 6, 9, 12, 0, 0, 0, TOKYO).toInstant());
+        stubReturn(end, ZonedDateTime.of(2031, 6, 9, 19, 30, 0, 0, TOKYO));
+
+        call("/transfers/departure", trip)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.flightDepartureAt").value("2031-06-09T18:00:00+09:00"))
+                .andExpect(jsonPath("$.scheduledDepartureAt").value("2031-06-09T18:00:00+09:00"))
+                .andExpect(jsonPath("$.revisedDepartureAt").value("2031-06-09T19:30:00+09:00"))
+                .andExpect(jsonPath("$.airportDeadline").value("2031-06-09T16:00:00+09:00"))
+                .andExpect(jsonPath("$.flightCheck.result").value("REFRESHED"))
+                .andExpect(jsonPath("$.flightCheck.checkedAt").value("2031-06-09T12:00:00+09:00"));
     }
 
     private CreateTripResponse create(LocalDate start) {

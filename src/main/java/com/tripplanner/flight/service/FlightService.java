@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -32,7 +33,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * 항공편 조회 + 캐시. 조회 순서: 메모리(Caffeine) → DB(flight_cache, 만료 전) → 공급자 → 메모리·DB 저장.
- * 캐시 TTL은 가장 이른 구간 출발 48시간 전부터 가장 늦은 구간 도착 3시간 뒤까지 10분, 그 외는 6시간이다.
+ * 캐시 TTL은 가장 이른 구간 출발 48시간 전부터 가장 늦은 구간 도착 3시간 뒤까지 10분, 그 외는 6시간이다
+ * (48시간 구간 전이면 구간 시작까지로 줄인다).
  * 공급자 장애 시 만료된 DB 캐시라도 있으면 그 값을 쓰고, 장애 후 30초 동안은 공급자를 다시 부르지 않는다.
  * 같은 키의 동시 요청은 공급자를 한 번만 호출한다.
  *
@@ -66,7 +68,7 @@ public class FlightService {
             .maximumSize(1_000)
             .expireAfterWrite(LONG_TTL)
             .build();
-    private final ConcurrentMap<CacheKey, CompletableFuture<List<FlightLeg>>> inFlight = new ConcurrentHashMap<>();
+    private final ConcurrentMap<CacheKey, CompletableFuture<FlightLookup>> inFlight = new ConcurrentHashMap<>();
     private volatile Instant providerBlockedUntil = Instant.MIN;
 
     public FlightService(FlightClient flightClient, FlightCacheRepository cacheRepository, ObjectMapper objectMapper,
@@ -83,21 +85,31 @@ public class FlightService {
      * @throws BusinessException FLIGHT_NOT_FOUND, FLIGHT_PROVIDER_UNAVAILABLE
      */
     public List<FlightLeg> lookup(FlightNumber flightNumber, LocalDate departureLocalDate) {
+        return lookupWithMeta(flightNumber, departureLocalDate).legs();
+    }
+
+    /**
+     * lookup과 같되 그 값을 공급자에서 받은 시각(fetchedAt)과 만료된 DB 캐시 대체 여부(stale)를 함께 준다.
+     * 저장된 여행 항공편 재조회가 "마지막 확인 시각"과 오래된 값 덮어쓰기 방지에 쓴다.
+     *
+     * @throws BusinessException FLIGHT_NOT_FOUND, FLIGHT_PROVIDER_UNAVAILABLE
+     */
+    public FlightLookup lookupWithMeta(FlightNumber flightNumber, LocalDate departureLocalDate) {
         CacheKey key = new CacheKey(flightNumber.value(), departureLocalDate);
         CachedLegs cached = memory.getIfPresent(key);
         if (cached != null && cached.isFresh(clock.instant())) {
-            return orNotFound(cached.legs());
+            return orNotFound(cached);
         }
 
-        CompletableFuture<List<FlightLeg>> mine = new CompletableFuture<>();
-        CompletableFuture<List<FlightLeg>> running = inFlight.putIfAbsent(key, mine);
+        CompletableFuture<FlightLookup> mine = new CompletableFuture<>();
+        CompletableFuture<FlightLookup> running = inFlight.putIfAbsent(key, mine);
         if (running != null) {
             return await(running);
         }
         try {
-            List<FlightLeg> legs = load(flightNumber, key);
-            mine.complete(legs);
-            return legs;
+            FlightLookup result = load(flightNumber, key);
+            mine.complete(result);
+            return result;
         } catch (Throwable e) {
             // Error까지 전달해야 대기 중인 요청이 join()에서 영원히 멈추지 않는다.
             mine.completeExceptionally(e);
@@ -108,19 +120,19 @@ public class FlightService {
     }
 
     /** 키별로 한 요청만 실행한다. */
-    private List<FlightLeg> load(FlightNumber flightNumber, CacheKey key) {
+    private FlightLookup load(FlightNumber flightNumber, CacheKey key) {
         Instant now = clock.instant();
         CachedLegs cached = memory.getIfPresent(key);
         if (cached != null && cached.isFresh(now)) {
-            return orNotFound(cached.legs());
+            return orNotFound(cached);
         }
 
         Optional<FlightCacheEntry> row = cacheRepository.findByFlightNoAndFlightDate(key.flightNo(), key.date());
         if (row.isPresent() && row.get().isFresh(now)) {
             Optional<List<FlightLeg>> legs = read(row.get());
             if (legs.isPresent()) {
-                memory.put(key, new CachedLegs(legs.get(), row.get().getExpiresAt()));
-                return legs.get();
+                memory.put(key, new CachedLegs(legs.get(), row.get().getFetchedAt(), row.get().getExpiresAt()));
+                return new FlightLookup(legs.get(), row.get().getFetchedAt(), false);
             }
         }
 
@@ -138,13 +150,13 @@ public class FlightService {
         }
 
         if (legs.isEmpty()) {
-            memory.put(key, new CachedLegs(legs, now.plus(NOT_FOUND_TTL)));
+            memory.put(key, new CachedLegs(legs, now, now.plus(NOT_FOUND_TTL)));
             throw new BusinessException(ErrorCode.FLIGHT_NOT_FOUND);
         }
         Instant expiresAt = now.plus(ttl(legs, now));
-        memory.put(key, new CachedLegs(legs, expiresAt));
+        memory.put(key, new CachedLegs(legs, now, expiresAt));
         save(row, key, legs, now, expiresAt);
-        return legs;
+        return new FlightLookup(legs, now, false);
     }
 
     /** 가는 편: 도착 공항이 도시 공항 중 하나인 첫 구간. */
@@ -157,10 +169,14 @@ public class FlightService {
         return legs.stream().filter(leg -> airportIatas.contains(leg.departure().iata())).findFirst();
     }
 
-    /** 가장 이른 구간 출발 - 48시간 ≤ now ≤ 가장 늦은 구간 도착 + 3시간이면 짧게 (지연 재조회가 비행 중에도 새 값을 받도록). */
+    /**
+     * 가장 이른 구간 출발 - 48시간 ≤ now ≤ 가장 늦은 구간 도착 + 3시간이면 짧게 (지연 재조회가 비행 중에도 새 값을 받도록).
+     * 그 구간 전이면 6시간이되 구간 시작까지로 줄여, 구간이 열린 뒤에는 늦어도 10분 안에 다시 받게 한다.
+     */
     static Duration ttl(List<FlightLeg> legs, Instant now) {
+        // 재조회 구간이 예정 출발 기준이므로 지연된 편도 예정·변경 중 이른 시각으로 판단한다.
         Instant earliestDeparture = legs.stream()
-                .map(leg -> leg.departure().effectiveTime())
+                .flatMap(leg -> Stream.of(leg.departure().scheduled(), leg.departure().effectiveTime()))
                 .min(Comparator.naturalOrder())
                 .orElseThrow();
         Instant latestArrival = legs.stream()
@@ -169,11 +185,17 @@ public class FlightService {
                 .orElseThrow();
         boolean active = !now.isBefore(earliestDeparture.minus(NEAR_DEPARTURE))
                 && !now.isAfter(latestArrival.plus(AFTER_ARRIVAL));
-        return active ? SHORT_TTL : LONG_TTL;
+        if (active) {
+            return SHORT_TTL;
+        }
+        Duration untilWindow = Duration.between(now, earliestDeparture.minus(NEAR_DEPARTURE));
+        return untilWindow.isPositive() && untilWindow.compareTo(LONG_TTL) < 0 ? untilWindow : LONG_TTL;
     }
 
-    private List<FlightLeg> staleOrUnavailable(Optional<FlightCacheEntry> row, FlightProviderException cause) {
-        return row.flatMap(this::read).orElseThrow(() -> cause != null
+    /** 만료된 DB 행으로 대체한다. fetchedAt은 그 행을 받은 시각이고 stale = true. */
+    private FlightLookup staleOrUnavailable(Optional<FlightCacheEntry> row, FlightProviderException cause) {
+        return row.flatMap(entry -> read(entry).map(legs -> new FlightLookup(legs, entry.getFetchedAt(), true)))
+                .orElseThrow(() -> cause != null
                 ? cause
                 : new FlightProviderException("공급자 장애 후 대기 중", null));
     }
@@ -208,7 +230,7 @@ public class FlightService {
         return Optional.of(List.copyOf(legs));
     }
 
-    private static List<FlightLeg> await(CompletableFuture<List<FlightLeg>> running) {
+    private static FlightLookup await(CompletableFuture<FlightLookup> running) {
         try {
             return running.join();
         } catch (CompletionException e) {
@@ -219,17 +241,21 @@ public class FlightService {
         }
     }
 
-    private static List<FlightLeg> orNotFound(List<FlightLeg> legs) {
-        if (legs.isEmpty()) {
+    private static FlightLookup orNotFound(CachedLegs cached) {
+        if (cached.legs().isEmpty()) {
             throw new BusinessException(ErrorCode.FLIGHT_NOT_FOUND);
         }
-        return legs;
+        return new FlightLookup(cached.legs(), cached.fetchedAt(), false);
     }
 
     private record CacheKey(String flightNo, LocalDate date) {
     }
 
-    private record CachedLegs(List<FlightLeg> legs, Instant expiresAt) {
+    /** 조회 결과. fetchedAt은 공급자에서 받은 시각, stale은 공급자 장애로 만료된 DB 캐시를 대신 준 경우. */
+    public record FlightLookup(List<FlightLeg> legs, Instant fetchedAt, boolean stale) {
+    }
+
+    private record CachedLegs(List<FlightLeg> legs, Instant fetchedAt, Instant expiresAt) {
 
         boolean isFresh(Instant now) {
             return now.isBefore(expiresAt);

@@ -44,7 +44,7 @@ class ArrivalTransferServiceIntegrationTest {
         CreateTripResponse trip = tripService.create(
                 new CreateTripRequest("KE723", "KE724", "OSA", 11L, START, START.plusDays(3), null));
 
-        ArrivalTransferResponse response = arrivalTransferService.arrival(trip.tripId(), trip.ownerToken(), 60, FlightCheckResult.OUT_OF_WINDOW);
+        ArrivalTransferResponse response = arrivalTransferService.arrival(trip.tripId(), trip.ownerToken(), 60, FlightCheckResult.BEFORE_WINDOW);
 
         assertThat(response.baseTime()).isEqualTo(OffsetDateTime.parse("2030-03-14T13:52:00+09:00"));
         assertThat(response.readyAt()).isEqualTo(OffsetDateTime.parse("2030-03-14T14:52:00+09:00"));
@@ -73,7 +73,7 @@ class ArrivalTransferServiceIntegrationTest {
         CreateTripResponse trip = tripService.create(
                 new CreateTripRequest("KE723", "KE724", "OSA", 14L, START, START.plusDays(3), null));
 
-        ArrivalTransferResponse response = arrivalTransferService.arrival(trip.tripId(), trip.ownerToken(), 60, FlightCheckResult.OUT_OF_WINDOW);
+        ArrivalTransferResponse response = arrivalTransferService.arrival(trip.tripId(), trip.ownerToken(), 60, FlightCheckResult.BEFORE_WINDOW);
 
         assertThat(response.options()).extracting(Option::routeId).containsExactly(106L, 111L);
         assertThat(response.noTransitWarning()).isFalse();

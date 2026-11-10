@@ -133,7 +133,7 @@ class DepartureTransferServiceIntegrationTest {
     void departureAt1800FromSeed() {
         CreateTripResponse trip = createTrip(NAMBA, "2030-03-18T18:00:00+09:00");
 
-        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.OUT_OF_WINDOW);
+        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.BEFORE_WINDOW);
 
         assertThat(response.flightDepartureAt()).isEqualTo(time("2030-03-18T18:00:00+09:00"));
         assertThat(response.airportDeadline()).isEqualTo(time("2030-03-18T16:00:00+09:00"));
@@ -174,7 +174,7 @@ class DepartureTransferServiceIntegrationTest {
     void inactiveRouteNotReturned() {
         CreateTripResponse trip = createTrip(TENNOJI, "2030-03-18T18:00:00+09:00");
 
-        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.OUT_OF_WINDOW);
+        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.BEFORE_WINDOW);
 
         assertThat(response.options()).extracting(Option::routeId).containsExactly(206L, 211L);
     }
@@ -184,7 +184,7 @@ class DepartureTransferServiceIntegrationTest {
     void departureAt0700FromSeed() {
         CreateTripResponse trip = createTrip(NAMBA, "2030-03-18T07:00:00+09:00");
 
-        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.OUT_OF_WINDOW);
+        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.BEFORE_WINDOW);
 
         assertThat(response.firstTrainTooLate()).isTrue();
         assertThat(response.latestLeaveAt()).isNull();
@@ -198,7 +198,7 @@ class DepartureTransferServiceIntegrationTest {
                 LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 24),
                 new ManualOverride(null, null, time("2026-11-24T05:00:00+09:00"), "KIX")));
 
-        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.OUT_OF_WINDOW);
+        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.BEFORE_WINDOW);
 
         assertThat(response.options().getFirst().routeId()).isEqualTo(202L);
         assertThat(response.options().getFirst().departures())
@@ -212,7 +212,7 @@ class DepartureTransferServiceIntegrationTest {
         CreateTripResponse trip = tripService.create(new CreateTripRequest("KE723", "TW9902", "OSA", NAMBA, START,
                 MONDAY, null));
 
-        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.OUT_OF_WINDOW);
+        DepartureTransferResponse response = departureTransferService.departure(trip.tripId(), trip.ownerToken(), 120, FlightCheckResult.BEFORE_WINDOW);
 
         assertThat(response.flightDepartureAt()).isEqualTo(time("2030-03-18T18:00:00+09:00"));
         assertThat(response.revisedDepartureAt()).isEqualTo(time("2030-03-18T19:30:00+09:00"));

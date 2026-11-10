@@ -133,14 +133,66 @@ class FlightServiceTest {
     }
 
     @Test
-    @DisplayName("출발이 48시간 1분 후면 TTL은 6시간이다")
+    @DisplayName("출발이 48시간 1분 후면 10분 구간 전이라 TTL은 구간 시작까지(1분)로 줄어든다")
     void ttlJustOverFortyEightHours() {
         Instant now = FORTY_EIGHT_HOURS_BEFORE.minus(Duration.ofMinutes(1));
         clock.set(now);
 
         service.lookup(KE723, DATE);
 
-        assertThat(savedEntry().getExpiresAt()).isEqualTo(now.plus(Duration.ofHours(6)));
+        assertThat(savedEntry().getExpiresAt()).isEqualTo(FORTY_EIGHT_HOURS_BEFORE);
+    }
+
+    @Test
+    @DisplayName("10분 구간 시작이 6시간 이상 남았으면 TTL은 6시간, 그보다 가까우면 구간 시작까지다")
+    void longTtlCappedAtWindowStart() {
+        assertThat(FlightService.ttl(List.of(ke723()), FORTY_EIGHT_HOURS_BEFORE.minus(Duration.ofHours(6))))
+                .isEqualTo(Duration.ofHours(6));
+        assertThat(FlightService.ttl(List.of(ke723()), FORTY_EIGHT_HOURS_BEFORE.minus(Duration.ofHours(5))))
+                .isEqualTo(Duration.ofHours(5));
+    }
+
+    @Test
+    @DisplayName("지연된 편은 예정 출발 기준으로 10분 구간이 열린다 (재조회 구간과 같게)")
+    void delayedDepartureUsesScheduledForWindow() {
+        FlightLeg delayed = new FlightLeg(
+                new FlightPoint("ICN", SEOUL, Instant.parse("2026-11-05T03:00:00Z"),
+                        Instant.parse("2026-11-05T06:00:00Z"), "2"),
+                new FlightPoint("KIX", TOKYO, Instant.parse("2026-11-05T04:45:00Z"),
+                        Instant.parse("2026-11-05T07:45:00Z"), "1"),
+                "Delayed");
+
+        assertThat(FlightService.ttl(List.of(delayed), FORTY_EIGHT_HOURS_BEFORE)).isEqualTo(Duration.ofMinutes(10));
+    }
+
+    @Test
+    @DisplayName("lookupWithMeta는 값을 공급자에서 받은 시각을 준다: 공급자는 지금, 메모리 캐시는 처음 받은 시각, DB 캐시는 행의 시각")
+    void lookupWithMetaReportsFetchTime() {
+        Instant first = clock.instant();
+        assertThat(service.lookupWithMeta(KE723, DATE)).isEqualTo(new FlightService.FlightLookup(List.of(ke723()),
+                first, false));
+
+        clock.advance(Duration.ofMinutes(5));
+        assertThat(service.lookupWithMeta(KE723, DATE).fetchedAt()).isEqualTo(first);
+
+        FlightCacheEntry row = entry(clock.instant().plusSeconds(60));
+        given(repository.findByFlightNoAndFlightDate("KE723", LocalDate.of(2026, 11, 6))).willReturn(Optional.of(row));
+        assertThat(service.lookupWithMeta(KE723, LocalDate.of(2026, 11, 6)).fetchedAt()).isEqualTo(row.getFetchedAt());
+    }
+
+    @Test
+    @DisplayName("공급자 장애로 만료된 DB 캐시를 대신 주면 stale이고 fetchedAt은 그 행을 받은 시각이다")
+    void staleFallbackIsMarked() {
+        FlightCacheEntry row = entry(clock.instant().minus(Duration.ofDays(1)));
+        given(repository.findByFlightNoAndFlightDate("KE723", DATE)).willReturn(Optional.of(row));
+        client.failure = new FlightProviderException("HTTP 429", null);
+
+        FlightService.FlightLookup lookup = service.lookupWithMeta(KE723, DATE);
+
+        assertThat(lookup.stale()).isTrue();
+        assertThat(lookup.fetchedAt()).isEqualTo(row.getFetchedAt());
+        clock.advance(Duration.ofSeconds(1));
+        assertThat(service.lookupWithMeta(KE723, DATE).stale()).isTrue();
     }
 
     @Test

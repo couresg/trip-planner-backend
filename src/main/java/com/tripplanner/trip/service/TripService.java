@@ -11,6 +11,7 @@ import com.tripplanner.common.exception.ErrorCode;
 import com.tripplanner.flight.domain.FlightLeg;
 import com.tripplanner.flight.domain.FlightNumber;
 import com.tripplanner.flight.service.FlightService;
+import com.tripplanner.flight.service.FlightService.FlightLookup;
 import com.tripplanner.trip.api.CreateTripRequest;
 import com.tripplanner.trip.api.CreateTripResponse;
 import com.tripplanner.trip.api.ManualOverride;
@@ -95,10 +96,10 @@ public class TripService {
         ManualOverride manual = request.manualOverride();
         TripFlight outbound = manual != null && manual.hasOutbound()
                 ? manualOutbound(outboundNo, startDate, manual, city, airports, now)
-                : lookupOutbound(outboundNo, startDate, city, airports, now);
+                : lookupOutbound(outboundNo, startDate, city, airports);
         TripFlight returnFlight = manual != null && manual.hasReturn()
                 ? manualReturn(returnNo, endDate, manual, city, airports, now)
-                : lookupReturn(returnNo, endDate, city, airports, now);
+                : lookupReturn(returnNo, endDate, city, airports);
         validateFlightOrder(outbound, returnFlight, airports);
 
         String ownerToken = ownerTokenService.issue();
@@ -239,19 +240,21 @@ public class TripService {
     }
 
     private TripFlight lookupOutbound(FlightNumber flightNo, LocalDate startDate, City city,
-            Map<String, Airport> airports, Instant now) {
-        List<FlightLeg> legs = flightService.lookup(flightNo, startDate);
+            Map<String, Airport> airports) {
+        FlightLookup lookup = flightService.lookupWithMeta(flightNo, startDate);
+        List<FlightLeg> legs = lookup.legs();
         FlightLeg leg = flightService.findArrivingAt(legs, airports.keySet())
                 .orElseThrow(() -> mismatch(city, "도착", legs.getLast().arrival().iata()));
-        return TripFlight.fromLeg(FlightDirection.OUTBOUND, flightNo.value(), startDate, leg, now);
+        return TripFlight.fromLeg(FlightDirection.OUTBOUND, flightNo.value(), startDate, leg, lookup.fetchedAt());
     }
 
     private TripFlight lookupReturn(FlightNumber flightNo, LocalDate endDate, City city,
-            Map<String, Airport> airports, Instant now) {
-        List<FlightLeg> legs = flightService.lookup(flightNo, endDate);
+            Map<String, Airport> airports) {
+        FlightLookup lookup = flightService.lookupWithMeta(flightNo, endDate);
+        List<FlightLeg> legs = lookup.legs();
         FlightLeg leg = flightService.findDepartingFrom(legs, airports.keySet())
                 .orElseThrow(() -> mismatch(city, "출발", legs.getFirst().departure().iata()));
-        return TripFlight.fromLeg(FlightDirection.RETURN, flightNo.value(), endDate, leg, now);
+        return TripFlight.fromLeg(FlightDirection.RETURN, flightNo.value(), endDate, leg, lookup.fetchedAt());
     }
 
     /** 수동 가는 편: 도착 현지 날짜는 시작일 또는 다음 날(자정 넘김 도착)이어야 한다. */
