@@ -139,6 +139,34 @@ class PlaceRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("이유의 제어 문자·줄바꿈·탭은 공백 하나로 바뀌고 연속 공백은 하나로 줄어든다")
+    void stripsControlCharsAndCollapsesWhitespace() {
+        Place place = place(501, PlaceCategory.SIGHT);
+
+        assertThat(PlaceRecommendationService.reason(" 첫 줄\n\n둘째\t줄\u0000끝\u001b[31m   빨강 ", place))
+                .isEqualTo("첫 줄 둘째 줄 끝 [31m 빨강");
+        assertThat(PlaceRecommendationService.reason("\n\t\u0007", place)).isEqualTo("관광 · 요약501 · 체류 약 60분");
+    }
+
+    @Test
+    @DisplayName("이유는 코드 포인트 기준 200자로 자르므로 이모지(서로게이트 쌍)가 깨지지 않는다")
+    void cutsByCodePoints() {
+        Place place = place(501, PlaceCategory.SIGHT);
+        String emoji = "😀"; // 😀, UTF-16 두 칸
+
+        String mixed = PlaceRecommendationService.reason("가".repeat(199) + emoji + emoji, place);
+        assertThat(mixed).isEqualTo("가".repeat(199) + emoji);
+
+        String emojis = PlaceRecommendationService.reason(emoji.repeat(250), place);
+        assertThat(emojis.codePointCount(0, emojis.length())).isEqualTo(200);
+        assertThat(emojis).isEqualTo(emoji.repeat(200));
+        assertThat(Character.isHighSurrogate(emojis.charAt(emojis.length() - 1))).isFalse();
+
+        // 정확히 200자는 그대로
+        assertThat(PlaceRecommendationService.reason(emoji.repeat(200), place)).isEqualTo(emoji.repeat(200));
+    }
+
+    @Test
     @DisplayName("추천기 예외는 RECOMMENDATION_UNAVAILABLE로 바꾸고 캐시하지 않아 다음 요청에서 다시 부른다")
     void providerFailure() {
         recommender.answer = q -> {

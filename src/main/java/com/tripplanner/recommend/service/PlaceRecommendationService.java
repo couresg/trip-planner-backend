@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -40,7 +41,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 @EnableConfigurationProperties(RecommendProperties.class)
 public class PlaceRecommendationService {
 
+    /** 이유 최대 길이 (유니코드 코드 포인트) */
     static final int REASON_MAX_LENGTH = 200;
+    private static final Pattern CONTROL = Pattern.compile("\\p{Cntrl}");
+    private static final Pattern SPACES = Pattern.compile("\\s+");
 
     private static final Logger log = LoggerFactory.getLogger(PlaceRecommendationService.class);
 
@@ -81,8 +85,14 @@ public class PlaceRecommendationService {
         if (count > 0) {
             CacheKey key = new CacheKey(loaded.cityId(), List.copyOf(candidates.keySet()), interests, pace, count);
             List<Candidate> facts = candidates.values().stream().map(PlaceRecommendationService::candidate).toList();
-            picks = cache.get(key, k -> sanitize(
-                    callRecommender(new PlaceRecommender.Query(interests, pace, count, facts)), candidates, count));
+            // cache.get(key, fn)은 계산 중 같은 해시 구간의 다른 키를 막으므로 추천기(다음 단계: 느린 LLM)를 그 안에서 부르지 않는다.
+            // 같은 키의 동시 요청은 추천기를 중복으로 부를 수 있고 나중 결과가 남는다.
+            picks = cache.getIfPresent(key);
+            if (picks == null) {
+                picks = sanitize(callRecommender(new PlaceRecommender.Query(interests, pace, count, facts)),
+                        candidates, count);
+                cache.put(key, picks);
+            }
         }
 
         List<PlaceRecommendationResponse.Recommendation> recommendations = new ArrayList<>();
@@ -135,13 +145,21 @@ public class PlaceRecommendationService {
         return List.copyOf(result);
     }
 
-    private static String reason(String raw, Place place) {
-        String reason = raw == null ? "" : raw.strip();
+    /**
+     * 제어 문자(줄바꿈·탭 포함)는 공백으로, 연속 공백은 하나로 바꾸고 앞뒤를 지운 뒤 코드 포인트 기준으로 자른다
+     * (UTF-16 길이로 자르면 이모지 같은 서로게이트 쌍이 깨진다).
+     */
+    static String reason(String raw, Place place) {
+        String reason = raw == null ? "" : CONTROL.matcher(raw).replaceAll(" ");
+        reason = SPACES.matcher(reason).replaceAll(" ").strip();
         if (reason.isEmpty()) {
             Candidate c = candidate(place);
             reason = c.category().labelKo() + " · " + c.facts();
         }
-        return reason.length() > REASON_MAX_LENGTH ? reason.substring(0, REASON_MAX_LENGTH) : reason;
+        if (reason.codePointCount(0, reason.length()) > REASON_MAX_LENGTH) {
+            reason = reason.substring(0, reason.offsetByCodePoints(0, REASON_MAX_LENGTH)).strip();
+        }
+        return reason;
     }
 
     private static Candidate candidate(Place p) {
