@@ -134,6 +134,29 @@ public class TripFlight {
         this.trip = trip;
     }
 
+    /**
+     * 재조회한 구간으로 시각·터미널·status를 덮어쓰고 fetchedAt을 checkedAt으로 바꾼다.
+     * 수동 입력 편이거나 저장된 값이 checkedAt보다 나중에 받은 값이면 바꾸지 않는다 (동시 요청의 오래된 값 방지).
+     *
+     * @return 갱신했으면 true
+     */
+    public boolean refresh(FlightLeg leg, Instant checkedAt) {
+        if (source == FlightSource.MANUAL || checkedAt.isBefore(fetchedAt)) {
+            return false;
+        }
+        FlightPoint dep = leg.departure();
+        FlightPoint arr = leg.arrival();
+        scheduledDepUtc = dep.scheduled();
+        revisedDepUtc = dep.revised();
+        depTerminal = dep.terminal();
+        scheduledArrUtc = arr.scheduled();
+        revisedArrUtc = arr.revised();
+        arrTerminal = arr.terminal();
+        status = leg.status();
+        fetchedAt = checkedAt;
+        return true;
+    }
+
     /** 계산 기준 도착 시각: revised ?? scheduled */
     public Instant arrivalAt() {
         return revisedArrUtc != null ? revisedArrUtc : scheduledArrUtc;
@@ -144,7 +167,7 @@ public class TripFlight {
         return revisedDepUtc != null ? revisedDepUtc : scheduledDepUtc;
     }
 
-    /** 귀국일 계산 기준 출발 시각: scheduled와 revised 중 이른 쪽. 저장된 지연은 갱신되지 않아 줄어들 수 있다. */
+    /** 귀국일 계산 기준 출발 시각: scheduled와 revised 중 이른 쪽. 지연은 출발 직전까지 줄어들 수 있다. */
     public Instant earliestDepartureAt() {
         return revisedDepUtc != null && revisedDepUtc.isBefore(scheduledDepUtc) ? revisedDepUtc : scheduledDepUtc;
     }

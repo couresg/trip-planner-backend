@@ -1,5 +1,6 @@
 package com.tripplanner.transfer.api;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -10,15 +11,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.tripplanner.common.exception.BusinessException;
 import com.tripplanner.common.exception.ErrorCode;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Fare;
+import com.tripplanner.transfer.api.ArrivalTransferResponse.FlightCheck;
 import com.tripplanner.transfer.api.DepartureTransferResponse.Departure;
 import com.tripplanner.transfer.api.DepartureTransferResponse.DepartureLabel;
 import com.tripplanner.transfer.api.DepartureTransferResponse.Option;
 import com.tripplanner.transfer.domain.TransportMode;
 import com.tripplanner.transfer.service.DepartureTransferService;
 import com.tripplanner.transfer.service.TransferProperties;
+import com.tripplanner.trip.domain.FlightDirection;
+import com.tripplanner.trip.service.FlightCheckResult;
+import com.tripplanner.trip.service.FlightRefreshService;
+import com.tripplanner.trip.service.FlightRefreshService.FlightRefresh;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,10 +57,20 @@ class DepartureTransferControllerTest {
     @MockitoBean
     DepartureTransferService departureTransferService;
 
+    @MockitoBean
+    FlightRefreshService flightRefreshService;
+
+    @BeforeEach
+    void stubRefresh() {
+        given(flightRefreshService.refresh(any(), any(), any())).willReturn(new FlightRefresh(Map.of(
+                FlightDirection.OUTBOUND, FlightCheckResult.REFRESHED,
+                FlightDirection.RETURN, FlightCheckResult.REFRESHED)));
+    }
+
     @Test
     @DisplayName("응답은 공항 오프셋 시각·timezone·label·outsideWindow·leaveByAt을 담는다")
     void responseShape() throws Exception {
-        given(departureTransferService.departure(TRIP_ID, TOKEN, 150)).willReturn(sampleResponse());
+        given(departureTransferService.departure(TRIP_ID, TOKEN, 150, FlightCheckResult.REFRESHED)).willReturn(sampleResponse());
 
         mockMvc.perform(departure("?airportBufferMin=150", TOKEN))
                 .andExpect(status().isOk())
@@ -60,6 +78,10 @@ class DepartureTransferControllerTest {
                 .andExpect(jsonPath("$.airportDeadline").value("2026-11-09T15:30:00+09:00"))
                 .andExpect(jsonPath("$.windowStart").value("2026-11-09T14:00:00+09:00"))
                 .andExpect(jsonPath("$.revisedDepartureAt").value("2026-11-09T19:30:00+09:00"))
+                .andExpect(jsonPath("$.scheduledDepartureAt").value("2026-11-09T18:00:00+09:00"))
+                .andExpect(jsonPath("$.flightStatus").value("Delayed"))
+                .andExpect(jsonPath("$.flightCheck.result").value("FAILED"))
+                .andExpect(jsonPath("$.flightCheck.checkedAt").value("2026-11-09T10:00:00+09:00"))
                 .andExpect(jsonPath("$.boardingMarginMin").value(10))
                 .andExpect(jsonPath("$.timezone").value("Asia/Tokyo"))
                 .andExpect(jsonPath("$.firstTrainTooLate").value(false))
@@ -95,11 +117,11 @@ class DepartureTransferControllerTest {
     @Test
     @DisplayName("airportBufferMin을 생략하면 기본 120분으로 조회한다")
     void defaultBuffer() throws Exception {
-        given(departureTransferService.departure(TRIP_ID, TOKEN, 120)).willReturn(sampleResponse());
+        given(departureTransferService.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.REFRESHED)).willReturn(sampleResponse());
 
         mockMvc.perform(departure("", TOKEN)).andExpect(status().isOk());
 
-        verify(departureTransferService).departure(TRIP_ID, TOKEN, 120);
+        verify(departureTransferService).departure(TRIP_ID, TOKEN, 120, FlightCheckResult.REFRESHED);
     }
 
     @Test
@@ -113,15 +135,15 @@ class DepartureTransferControllerTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.errors[0].field").value("airportBufferMin"));
 
-        verifyNoInteractions(departureTransferService);
+        verifyNoInteractions(departureTransferService, flightRefreshService);
     }
 
     @Test
     @DisplayName("없는 여행은 404 TRIP_NOT_FOUND, 토큰 불일치는 403 FORBIDDEN_TRIP")
     void notFoundAndForbidden() throws Exception {
-        given(departureTransferService.departure("unknown", TOKEN, 120))
+        given(departureTransferService.departure("unknown", TOKEN, 120, FlightCheckResult.REFRESHED))
                 .willThrow(new BusinessException(ErrorCode.TRIP_NOT_FOUND, "여행을 찾을 수 없습니다."));
-        given(departureTransferService.departure(TRIP_ID, null, 120))
+        given(departureTransferService.departure(TRIP_ID, null, 120, FlightCheckResult.REFRESHED))
                 .willThrow(new BusinessException(ErrorCode.FORBIDDEN_TRIP, "이 여행에 접근할 권한이 없습니다."));
 
         mockMvc.perform(get("/api/v1/trips/unknown/transfers/departure").header("X-Owner-Token", TOKEN))
@@ -156,7 +178,8 @@ class DepartureTransferControllerTest {
                 null);
         return new DepartureTransferResponse(time("2026-11-09T18:00:00+09:00"), time("2026-11-09T19:30:00+09:00"),
                 time("2026-11-09T15:30:00+09:00"), time("2026-11-09T14:00:00+09:00"), "Asia/Tokyo", 10, false, false,
-                time("2026-11-09T14:30:00+09:00"),
+                time("2026-11-09T14:30:00+09:00"), time("2026-11-09T18:00:00+09:00"), "Delayed",
+                new FlightCheck(FlightCheckResult.FAILED, time("2026-11-09T10:00:00+09:00")),
                 List.of(rapit, express, taxi));
     }
 

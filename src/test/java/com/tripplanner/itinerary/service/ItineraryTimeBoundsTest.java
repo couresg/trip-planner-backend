@@ -24,7 +24,7 @@ class ItineraryTimeBoundsTest {
 
     private static ArrivalTransferResponse arrival(List<ArrivalTransferResponse.Option> options) {
         return new ArrivalTransferResponse(READY_AT.minusHours(1), READY_AT.minusHours(1), READY_AT.plusHours(1),
-                READY_AT, "Asia/Tokyo", false, options);
+                READY_AT, "Asia/Tokyo", false, READY_AT.minusHours(1), "Expected", null, options);
     }
 
     private static ArrivalTransferResponse.Option arrivalOption(TransportMode mode, int durationMin, int walkMin,
@@ -46,7 +46,7 @@ class ItineraryTimeBoundsTest {
                 .toList();
         OffsetDateTime flight = time("2026-11-09T18:00:00+09:00");
         return new DepartureTransferResponse(flight, null, flight.minusHours(2), flight.minusMinutes(210),
-                "Asia/Tokyo", 10, latestLeaveAt == null, noTime, latestLeaveAt, options);
+                "Asia/Tokyo", 10, latestLeaveAt == null, noTime, latestLeaveAt, flight, "Expected", null, options);
     }
 
     @Test

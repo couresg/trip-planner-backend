@@ -23,6 +23,7 @@ import com.tripplanner.trip.api.CreateTripResponse;
 import com.tripplanner.trip.api.ManualOverride;
 import com.tripplanner.trip.api.TripController;
 import com.tripplanner.trip.service.TripService;
+import com.tripplanner.trip.service.FlightCheckResult;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -117,7 +118,7 @@ class ItineraryIntegrationTest {
 
         for (int immigrationMin : List.of(30, 90)) {
             OffsetDateTime expected = arrivalTransferService
-                    .arrival(trip.tripId(), trip.ownerToken(), immigrationMin).options().stream()
+                    .arrival(trip.tripId(), trip.ownerToken(), immigrationMin, FlightCheckResult.OUT_OF_WINDOW).options().stream()
                     .flatMap(option -> option.departures().stream())
                     .filter(ArrivalTransferResponse.Departure::recommended)
                     .map(ArrivalTransferResponse.Departure::arriveAreaAt)
@@ -165,7 +166,7 @@ class ItineraryIntegrationTest {
         add(trip, HOZENJI, D2, null);
         add(trip, HOZENJI, D2, "09:00");
 
-        ArrivalTransferResponse arrival = arrivalTransferService.arrival(trip.tripId(), trip.ownerToken(), 60);
+        ArrivalTransferResponse arrival = arrivalTransferService.arrival(trip.tripId(), trip.ownerToken(), 60, FlightCheckResult.OUT_OF_WINDOW);
         assertThat(arrival.options()).flatExtracting(ArrivalTransferResponse.Option::departures)
                 .noneMatch(ArrivalTransferResponse.Departure::recommended);
         ArrivalTransferResponse.Option taxi = arrival.options().stream()

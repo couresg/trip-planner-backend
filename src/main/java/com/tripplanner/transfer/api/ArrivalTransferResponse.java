@@ -2,6 +2,7 @@ package com.tripplanner.transfer.api;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.tripplanner.transfer.domain.TransportMode;
+import com.tripplanner.trip.service.FlightCheckResult;
 import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -17,7 +18,14 @@ public record ArrivalTransferResponse(
         OffsetDateTime readyAt,
         String timezone,
         boolean noTransitWarning,
+        OffsetDateTime scheduledArrivalAt,
+        String flightStatus,
+        FlightCheck flightCheck,
         List<Option> options) {
+
+    /** 저장된 항공편 재조회 결과와 마지막으로 공급자 값을 받은 시각(trip_flight.fetched_at, 공항 현지 오프셋). */
+    public record FlightCheck(FlightCheckResult result, OffsetDateTime checkedAt) {
+    }
 
     public record Option(
             long routeId,

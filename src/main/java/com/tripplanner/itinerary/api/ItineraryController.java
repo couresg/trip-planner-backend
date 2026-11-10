@@ -5,8 +5,12 @@ import com.tripplanner.common.exception.ErrorCode;
 import com.tripplanner.itinerary.service.ItineraryService;
 import com.tripplanner.transfer.service.TransferProperties;
 import com.tripplanner.trip.api.TripController;
+import com.tripplanner.trip.domain.FlightDirection;
+import com.tripplanner.trip.service.FlightRefreshService;
+import com.tripplanner.trip.service.FlightRefreshService.FlightRefresh;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.util.EnumSet;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,13 +32,19 @@ public class ItineraryController {
 
     private final ItineraryService itineraryService;
     private final TransferProperties properties;
+    private final FlightRefreshService flightRefreshService;
 
-    public ItineraryController(ItineraryService itineraryService, TransferProperties properties) {
+    public ItineraryController(ItineraryService itineraryService, TransferProperties properties,
+            FlightRefreshService flightRefreshService) {
         this.itineraryService = itineraryService;
         this.properties = properties;
+        this.flightRefreshService = flightRefreshService;
     }
 
-    /** immigrationMin·airportBufferMin: 교통편 API와 같은 기본값·허용 값. 허용 값 검증이 여행 조회(404/403)보다 먼저다. */
+    /**
+     * immigrationMin·airportBufferMin: 교통편 API와 같은 기본값·허용 값. 허용 값 검증이 여행 조회(404/403)보다 먼저다.
+     * 계산 전에 두 편을 재조회한다 (실패해도 저장된 값으로 응답).
+     */
     @GetMapping
     public ItineraryResponse get(@PathVariable String tripId,
             @RequestParam(required = false) Integer immigrationMin,
@@ -50,7 +60,9 @@ public class ItineraryController {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED,
                     "airportBufferMin은 " + properties.airportBufferOptions() + " 중 하나여야 합니다.");
         }
-        return itineraryService.get(tripId, ownerToken, immigration, buffer);
+        FlightRefresh refresh = flightRefreshService.refresh(tripId, ownerToken,
+                EnumSet.of(FlightDirection.OUTBOUND, FlightDirection.RETURN));
+        return itineraryService.get(tripId, ownerToken, immigration, buffer, refresh);
     }
 
     @PostMapping("/items")

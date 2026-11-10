@@ -18,6 +18,7 @@ import com.tripplanner.transfer.api.ArrivalTransferResponse;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Departure;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.DepartureStatus;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Fare;
+import com.tripplanner.transfer.api.ArrivalTransferResponse.FlightCheck;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Option;
 import com.tripplanner.transfer.domain.DayType;
 import com.tripplanner.transfer.domain.RouteDirection;
@@ -26,9 +27,13 @@ import com.tripplanner.transfer.domain.ServiceMinute;
 import com.tripplanner.transfer.domain.TransportMode;
 import com.tripplanner.transfer.domain.TransportRoute;
 import com.tripplanner.transfer.repository.TransportRouteRepository;
+import com.tripplanner.flight.domain.FlightLeg;
+import com.tripplanner.flight.domain.FlightPoint;
+import com.tripplanner.trip.domain.FlightDirection;
 import com.tripplanner.trip.domain.Trip;
 import com.tripplanner.trip.domain.TripFlight;
 import com.tripplanner.trip.service.TripService;
+import com.tripplanner.trip.service.FlightCheckResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -89,7 +94,7 @@ class ArrivalTransferServiceTest {
         seedNambaRoutes();
         arriveAt(at(5, 14, 0));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.baseTime()).isEqualTo(offset(5, 14, 0));
         assertThat(response.windowStart()).isEqualTo(offset(5, 14, 0));
@@ -138,13 +143,13 @@ class ArrivalTransferServiceTest {
         seedNambaRoutes();
         arriveAt(at(5, 14, 0));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 30);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 30, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.readyAt()).isEqualTo(offset(5, 14, 30));
         assertThat(recommendedDepartAt(response.options().get(0))).containsExactly(offset(5, 14, 35));
         assertThat(recommendedDepartAt(response.options().get(1))).containsExactly(offset(5, 14, 45));
 
-        ArrivalTransferResponse slower = service.arrival(TRIP_ID, TOKEN, 90);
+        ArrivalTransferResponse slower = service.arrival(TRIP_ID, TOKEN, 90, FlightCheckResult.OUT_OF_WINDOW);
         assertThat(recommendedDepartAt(slower.options().get(0))).containsExactly(offset(5, 15, 35));
         assertThat(recommendedDepartAt(slower.options().get(1))).containsExactly(offset(5, 15, 45));
     }
@@ -155,7 +160,7 @@ class ArrivalTransferServiceTest {
         seedNambaRoutes();
         arriveAt(at(5, 14, 5));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 30);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 30, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.readyAt()).isEqualTo(offset(5, 14, 35));
         assertThat(response.options().get(0).departures()).first()
@@ -165,13 +170,39 @@ class ArrivalTransferServiceTest {
     }
 
     @Test
+    @DisplayName("재조회로 23:30 도착이 다음 날 00:40으로 지연되면 00:40~02:40으로 다시 계산하고 예정 시각을 함께 준다")
+    void refreshedDelayCrossesMidnight() {
+        routes.add(route(301, TransportMode.BUS, "심야버스", 30, 0, 1000, 1000,
+                Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(1420, 1470, 1530, 1560)))));
+        Trip trip = new Trip("hash", osaka, namba, START, START.plusDays(3), CLOCK.instant());
+        TripFlight outbound = TripFlight.fromLeg(FlightDirection.OUTBOUND, "KE723", START,
+                leg(at(5, 21, 30), at(5, 23, 30), null, "Expected"), CLOCK.instant());
+        trip.addFlight(outbound);
+        given(tripService.findOwned(TRIP_ID, TOKEN)).willReturn(trip);
+        Instant checkedAt = at(5, 22, 0).toInstant();
+        outbound.refresh(leg(at(5, 22, 40), at(5, 23, 30), at(6, 0, 40), "Delayed"), checkedAt);
+
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.REFRESHED);
+
+        assertThat(response.scheduledArrivalAt()).isEqualTo(offset(5, 23, 30));
+        assertThat(response.baseTime()).isEqualTo(offset(6, 0, 40));
+        assertThat(response.windowEnd()).isEqualTo(offset(6, 2, 40));
+        assertThat(response.readyAt()).isEqualTo(offset(6, 1, 40));
+        assertThat(response.flightStatus()).isEqualTo("Delayed");
+        assertThat(response.flightCheck()).isEqualTo(new FlightCheck(FlightCheckResult.REFRESHED, offset(5, 22, 0)));
+        assertThat(response.options().getFirst().departures()).containsExactly(
+                departure(at(6, 1, 30), 30, DepartureStatus.HARD_TO_CATCH, false),
+                departure(at(6, 2, 0), 30, DepartureStatus.AVAILABLE, true));
+    }
+
+    @Test
     @DisplayName("23시30분 도착이면 자정 넘어 01시30분까지의 출발편을 조회한다 (전날 운행일 1470분 포함)")
     void arrivalAt2330FindsAfterMidnightDepartures() {
         routes.add(route(301, TransportMode.BUS, "심야버스", 30, 0, 1000, 1000,
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(1420, 1470, 1530, 1560)))));
         arriveAt(at(5, 23, 30));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.windowEnd()).isEqualTo(offset(6, 1, 30));
         assertThat(response.readyAt()).isEqualTo(offset(6, 0, 30));
@@ -188,7 +219,7 @@ class ArrivalTransferServiceTest {
         seedNambaRoutes();
         arriveAt(at(5, 23, 30));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.windowStart()).isEqualTo(offset(5, 23, 30));
         assertThat(response.windowEnd()).isEqualTo(offset(6, 1, 30));
@@ -207,7 +238,7 @@ class ArrivalTransferServiceTest {
         routes.add(route(103, TransportMode.BUS, "리무진버스", 50, 0, 1800, 1800, Schedule.headway(400, 1420, 30)));
         arriveAt(at(5, 22, 50));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.readyAt()).isEqualTo(offset(5, 23, 50));
         assertThat(response.windowEnd()).isEqualTo(offset(6, 0, 50));
@@ -236,7 +267,7 @@ class ArrivalTransferServiceTest {
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(1440)))));
         arriveAt(at(5, 22, 50));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.noTransitWarning()).isFalse();
         assertThat(response.options()).extracting(Option::routeId, Option::nextFirstDeparture)
@@ -255,7 +286,7 @@ class ArrivalTransferServiceTest {
         seedNambaRoutes();
         arriveAt(at(6, 2, 0));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.windowEnd()).isEqualTo(offset(6, 4, 0));
         assertThat(response.noTransitWarning()).isTrue();
@@ -277,7 +308,7 @@ class ArrivalTransferServiceTest {
         routes.add(route(94, TransportMode.RIDE_HAILING, "차량 호출", 50, 0, null, null, Schedule.none()));
         arriveAt(at(5, 14, 0));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options()).extracting(Option::routeId).containsExactly(92L, 91L, 93L, 90L, 94L);
         Option noRecommendation = response.options().get(2);
@@ -294,7 +325,7 @@ class ArrivalTransferServiceTest {
         routes.add(route(108, TransportMode.TAXI, "택시", 50, 0, 17000, 20000, Schedule.none()));
         arriveAt(at(5, 14, 0));
 
-        assertThat(service.arrival(TRIP_ID, TOKEN, 60).noTransitWarning()).isTrue();
+        assertThat(service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW).noTransitWarning()).isTrue();
     }
 
     @Test
@@ -303,7 +334,7 @@ class ArrivalTransferServiceTest {
         given(tripService.findOwned(TRIP_ID, "wrong"))
                 .willThrow(new BusinessException(ErrorCode.FORBIDDEN_TRIP, "이 여행에 접근할 권한이 없습니다."));
 
-        assertThatThrownBy(() -> service.arrival(TRIP_ID, "wrong", 60))
+        assertThatThrownBy(() -> service.arrival(TRIP_ID, "wrong", 60, FlightCheckResult.OUT_OF_WINDOW))
                 .isInstanceOfSatisfying(BusinessException.class,
                         e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.FORBIDDEN_TRIP));
         verifyNoInteractions(routeRepository);
@@ -314,7 +345,7 @@ class ArrivalTransferServiceTest {
     void queriesRoutesByAirportAndArea() {
         arriveAt(at(5, 14, 0));
 
-        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60);
+        ArrivalTransferResponse response = service.arrival(TRIP_ID, TOKEN, 60, FlightCheckResult.OUT_OF_WINDOW);
 
         verify(routeRepository).findAllByAirportIdAndAreaIdAndDirectionAndActiveTrueOrderByIdAsc(1L, 11L,
                 RouteDirection.AIRPORT_TO_AREA);
@@ -378,6 +409,14 @@ class ArrivalTransferServiceTest {
             boolean recommended) {
         return new Departure(departAt.toOffsetDateTime(), departAt.plusMinutes(toAreaMin).toOffsetDateTime(), status,
                 recommended);
+    }
+
+    private static FlightLeg leg(ZonedDateTime departure, ZonedDateTime scheduledArrival,
+            ZonedDateTime revisedArrival, String status) {
+        return new FlightLeg(new FlightPoint("ICN", ZoneId.of("Asia/Seoul"), departure.toInstant(), null, "2"),
+                new FlightPoint("KIX", TOKYO, scheduledArrival.toInstant(),
+                        revisedArrival == null ? null : revisedArrival.toInstant(), "1"),
+                status);
     }
 
     private static ZonedDateTime at(int day, int hour, int minute) {

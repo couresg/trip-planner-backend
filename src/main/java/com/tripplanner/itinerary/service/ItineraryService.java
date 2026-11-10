@@ -14,7 +14,9 @@ import com.tripplanner.transfer.api.ArrivalTransferResponse;
 import com.tripplanner.transfer.api.DepartureTransferResponse;
 import com.tripplanner.transfer.service.ArrivalTransferService;
 import com.tripplanner.transfer.service.DepartureTransferService;
+import com.tripplanner.trip.domain.FlightDirection;
 import com.tripplanner.trip.domain.Trip;
+import com.tripplanner.trip.service.FlightRefreshService.FlightRefresh;
 import com.tripplanner.trip.service.TripService;
 import java.time.Clock;
 import java.time.Instant;
@@ -70,12 +72,15 @@ public class ItineraryService {
         this.clock = clock;
     }
 
-    /** @throws BusinessException TRIP_NOT_FOUND, FORBIDDEN_TRIP */
+    /** flightRefresh: 호출 전 두 편 재조회 결과 (교통편 계산에 넘기고 응답에는 담지 않는다). @throws BusinessException TRIP_NOT_FOUND, FORBIDDEN_TRIP */
     @Transactional(readOnly = true)
-    public ItineraryResponse get(String tripId, String ownerToken, int immigrationMin, int airportBufferMin) {
+    public ItineraryResponse get(String tripId, String ownerToken, int immigrationMin, int airportBufferMin,
+            FlightRefresh flightRefresh) {
         Trip trip = tripService.findOwned(tripId, ownerToken);
-        OffsetDateTime earliest = earliestStart(arrivalTransferService.calculate(trip, immigrationMin));
-        OffsetDateTime latest = latestEnd(departureTransferService.calculate(trip, airportBufferMin));
+        OffsetDateTime earliest = earliestStart(arrivalTransferService.calculate(trip, immigrationMin,
+                flightRefresh.of(FlightDirection.OUTBOUND)));
+        OffsetDateTime latest = latestEnd(departureTransferService.calculate(trip, airportBufferMin,
+                flightRefresh.of(FlightDirection.RETURN)));
         ZoneId zone = ZoneId.of(trip.getCity().getTimezone());
 
         Map<LocalDate, List<ItineraryItem>> itemsByDate = itemRepository

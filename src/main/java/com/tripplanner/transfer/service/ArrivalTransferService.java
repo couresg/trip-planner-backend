@@ -6,6 +6,7 @@ import com.tripplanner.transfer.api.ArrivalTransferResponse;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Departure;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.DepartureStatus;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Fare;
+import com.tripplanner.transfer.api.ArrivalTransferResponse.FlightCheck;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Option;
 import com.tripplanner.transfer.domain.RouteDirection;
 import com.tripplanner.transfer.domain.Schedule;
@@ -14,10 +15,12 @@ import com.tripplanner.transfer.repository.TransportRouteRepository;
 import com.tripplanner.trip.domain.FlightDirection;
 import com.tripplanner.trip.domain.Trip;
 import com.tripplanner.trip.domain.TripFlight;
+import com.tripplanner.trip.service.FlightCheckResult;
 import com.tripplanner.trip.service.TripService;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -57,13 +60,17 @@ public class ArrivalTransferService {
 
     /** @throws com.tripplanner.common.exception.BusinessException TRIP_NOT_FOUND, FORBIDDEN_TRIP */
     @Transactional(readOnly = true)
-    public ArrivalTransferResponse arrival(String tripId, String ownerToken, int immigrationMin) {
-        return calculate(tripService.findOwned(tripId, ownerToken), immigrationMin);
+    public ArrivalTransferResponse arrival(String tripId, String ownerToken, int immigrationMin,
+            FlightCheckResult flightCheck) {
+        return calculate(tripService.findOwned(tripId, ownerToken), immigrationMin, flightCheck);
     }
 
-    /** 소유자 확인을 마친 여행으로 계산한다. 일정 서비스가 호출자 트랜잭션 안에서 쓴다. */
+    /**
+     * 소유자 확인을 마친 여행으로 계산한다. 일정 서비스가 호출자 트랜잭션 안에서 쓴다.
+     * flightCheck는 호출 전 FlightRefreshService의 가는 편 재조회 결과다.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
-    public ArrivalTransferResponse calculate(Trip trip, int immigrationMin) {
+    public ArrivalTransferResponse calculate(Trip trip, int immigrationMin, FlightCheckResult flightCheck) {
         TripFlight outbound = trip.flight(FlightDirection.OUTBOUND);
         Airport airport = TripAirports.find(airportRepository, trip, outbound.getArrAirportIata());
         ZoneId zone = ZoneId.of(airport.getTimezone());
@@ -95,7 +102,9 @@ public class ArrivalTransferService {
 
         return new ArrivalTransferResponse(base.toOffsetDateTime(), base.toOffsetDateTime(),
                 windowEnd.toOffsetDateTime(), readyAt.toOffsetDateTime(), zone.getId(), !anyTransitAvailable,
-                options);
+                outbound.getScheduledArrUtc().atZone(zone).toOffsetDateTime(), outbound.getStatus(),
+                new FlightCheck(flightCheck, outbound.getFetchedAt().truncatedTo(ChronoUnit.SECONDS).atZone(zone)
+                        .toOffsetDateTime()), options);
     }
 
     private RankedOption transit(TransportRoute route, String countryCode, ZonedDateTime windowStart,

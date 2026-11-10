@@ -1,6 +1,7 @@
 package com.tripplanner.transfer.api;
 
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Fare;
+import com.tripplanner.transfer.api.ArrivalTransferResponse.FlightCheck;
 import com.tripplanner.transfer.domain.TransportMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -17,6 +18,9 @@ public record DepartureTransferResponse(
         boolean firstTrainTooLate,
         boolean noTimeAfterLanding,
         OffsetDateTime latestLeaveAt,
+        OffsetDateTime scheduledDepartureAt,
+        String flightStatus,
+        FlightCheck flightCheck,
         List<Option> options) {
 
     public record Option(

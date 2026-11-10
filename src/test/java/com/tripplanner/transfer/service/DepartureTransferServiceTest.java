@@ -16,6 +16,7 @@ import com.tripplanner.common.exception.BusinessException;
 import com.tripplanner.common.exception.ErrorCode;
 import com.tripplanner.flight.domain.FlightLeg;
 import com.tripplanner.flight.domain.FlightPoint;
+import com.tripplanner.transfer.api.ArrivalTransferResponse;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Fare;
 import com.tripplanner.transfer.api.DepartureTransferResponse;
 import com.tripplanner.transfer.api.DepartureTransferResponse.Departure;
@@ -32,6 +33,7 @@ import com.tripplanner.trip.domain.FlightDirection;
 import com.tripplanner.trip.domain.Trip;
 import com.tripplanner.trip.domain.TripFlight;
 import com.tripplanner.trip.service.TripService;
+import com.tripplanner.trip.service.FlightCheckResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -92,7 +94,7 @@ class DepartureTransferServiceTest {
         seedRoutes();
         departAt(at(5, 18, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.flightDepartureAt()).isEqualTo(offset(5, 18, 0));
         assertThat(response.airportDeadline()).isEqualTo(offset(5, 16, 0));
@@ -140,13 +142,13 @@ class DepartureTransferServiceTest {
         seedRoutes();
         departAt(at(5, 18, 0));
 
-        DepartureTransferResponse buffer150 = service.departure(TRIP_ID, TOKEN, 150);
+        DepartureTransferResponse buffer150 = service.departure(TRIP_ID, TOKEN, 150, FlightCheckResult.OUT_OF_WINDOW);
         assertThat(buffer150.airportDeadline()).isEqualTo(offset(5, 15, 30));
         assertThat(buffer150.windowStart()).isEqualTo(offset(5, 14, 0));
         assertThat(latestDepartAt(buffer150.options().getFirst())).isEqualTo(offset(5, 14, 30));
         assertThat(buffer150.options().get(2).leaveByAt()).isEqualTo(offset(5, 14, 40));
 
-        DepartureTransferResponse buffer180 = service.departure(TRIP_ID, TOKEN, 180);
+        DepartureTransferResponse buffer180 = service.departure(TRIP_ID, TOKEN, 180, FlightCheckResult.OUT_OF_WINDOW);
         assertThat(buffer180.airportDeadline()).isEqualTo(offset(5, 15, 0));
         assertThat(buffer180.windowStart()).isEqualTo(offset(5, 13, 30));
         assertThat(latestDepartAt(buffer180.options().getFirst())).isEqualTo(offset(5, 14, 0));
@@ -160,7 +162,7 @@ class DepartureTransferServiceTest {
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(360, 390, 420, 450)))));
         departAt(at(5, 10, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.airportDeadline()).isEqualTo(offset(5, 8, 0));
         assertThat(response.windowStart()).isEqualTo(offset(5, 6, 30));
@@ -181,7 +183,7 @@ class DepartureTransferServiceTest {
         routes.add(taxi());
         departAt(at(6, 7, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.airportDeadline()).isEqualTo(offset(6, 5, 0));
         assertThat(response.windowStart()).isEqualTo(offset(6, 3, 30));
@@ -201,7 +203,7 @@ class DepartureTransferServiceTest {
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(13 * 60 + 59, 14 * 60, 15 * 60 + 30, 15 * 60 + 31)))));
         departAt(at(5, 18, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options().getFirst().departures()).containsExactly(
                 inWindow(at(5, 14, 0), 5, 30, DepartureLabel.SAFER),
@@ -218,7 +220,7 @@ class DepartureTransferServiceTest {
         routes.add(taxi());
         departAt(at(6, 5, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.airportDeadline()).isEqualTo(offset(6, 3, 0));
         assertThat(response.windowStart()).isEqualTo(offset(6, 1, 30));
@@ -242,7 +244,7 @@ class DepartureTransferServiceTest {
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(22 * 60 + 19)))));
         departAt(at(6, 5, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options()).extracting(Option::routeId).containsExactly(301L, 302L);
         assertThat(response.options().getFirst().departures()).extracting(Departure::label, Departure::outsideWindow)
@@ -258,7 +260,7 @@ class DepartureTransferServiceTest {
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(13 * 60, 15 * 60)))));
         departAt(at(5, 18, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options().getFirst().departures())
                 .containsExactly(inWindow(at(5, 15, 0), 5, 40, DepartureLabel.LATEST));
@@ -274,7 +276,7 @@ class DepartureTransferServiceTest {
                         DayType.SATURDAY, minutes(400)))));
         departAt(at(7, 2, 30));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.airportDeadline()).isEqualTo(offset(7, 0, 30));
         assertThat(response.windowStart()).isEqualTo(offset(6, 23, 0));
@@ -296,7 +298,7 @@ class DepartureTransferServiceTest {
                         DayType.HOLIDAY, minutes(200)))));
         departAt(at(7, 6, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options().getFirst().departures()).extracting(Departure::departAt, Departure::label)
                 .containsExactly(
@@ -311,7 +313,7 @@ class DepartureTransferServiceTest {
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(15 * 60)))));
         departAt(at(5, 18, 0));
 
-        assertThat(service.departure(TRIP_ID, TOKEN, 120).options().getFirst().departures())
+        assertThat(service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW).options().getFirst().departures())
                 .extracting(Departure::label, Departure::outsideWindow)
                 .containsExactly(tuple(DepartureLabel.LATEST, false));
     }
@@ -331,7 +333,7 @@ class DepartureTransferServiceTest {
         routes.add(route(96, TransportMode.BUS, "또 편 없는 버스", 60, 0, 1000, 1000, Schedule.none()));
         departAt(at(5, 18, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options()).extracting(Option::routeId).containsExactly(93L, 95L, 92L, 91L, 96L, 90L, 94L);
         assertThat(response.options().getLast().fare()).isNull();
@@ -343,7 +345,7 @@ class DepartureTransferServiceTest {
         routes.add(taxi());
         departAt(at(5, 18, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.firstTrainTooLate()).isTrue();
         assertThat(response.latestLeaveAt()).isNull();
@@ -354,7 +356,7 @@ class DepartureTransferServiceTest {
     void laterRevisedIsNotUsed() {
         departWithRevised(at(5, 18, 0), at(5, 19, 30));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.flightDepartureAt()).isEqualTo(offset(5, 18, 0));
         assertThat(response.revisedDepartureAt()).isEqualTo(offset(5, 19, 30));
@@ -362,11 +364,33 @@ class DepartureTransferServiceTest {
     }
 
     @Test
+    @DisplayName("재조회로 지연(18:00 → 19:30)이 반영돼도 마감은 예정 기준이고 예정·status·확인 시각을 함께 준다")
+    void refreshedDelayKeepsScheduledDeadline() {
+        departWithRevised(at(5, 18, 0), at(5, 18, 0));
+        TripFlight returnFlight = tripService.findOwned(TRIP_ID, TOKEN).flight(FlightDirection.RETURN);
+        Instant checkedAt = at(5, 12, 0).toInstant();
+        returnFlight.refresh(new FlightLeg(
+                new FlightPoint("KIX", TOKYO, at(5, 18, 0).toInstant(), at(5, 19, 30).toInstant(), "1"),
+                new FlightPoint("ICN", ZoneId.of("Asia/Seoul"), at(5, 20, 0).toInstant(), null, "2"), "Delayed"),
+                checkedAt);
+
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.REFRESHED);
+
+        assertThat(response.flightDepartureAt()).isEqualTo(offset(5, 18, 0));
+        assertThat(response.scheduledDepartureAt()).isEqualTo(offset(5, 18, 0));
+        assertThat(response.revisedDepartureAt()).isEqualTo(offset(5, 19, 30));
+        assertThat(response.airportDeadline()).isEqualTo(offset(5, 16, 0));
+        assertThat(response.flightStatus()).isEqualTo("Delayed");
+        assertThat(response.flightCheck()).isEqualTo(new ArrivalTransferResponse.FlightCheck(
+                FlightCheckResult.REFRESHED, offset(5, 12, 0)));
+    }
+
+    @Test
     @DisplayName("앞당겨진 revised는 그 시각을 기준으로 계산하고 revisedDepartureAt은 없다")
     void earlierRevisedIsUsed() {
         departWithRevised(at(5, 18, 0), at(5, 17, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.flightDepartureAt()).isEqualTo(offset(5, 17, 0));
         assertThat(response.revisedDepartureAt()).isNull();
@@ -378,7 +402,7 @@ class DepartureTransferServiceTest {
     void sameRevisedIsNotReported() {
         departWithRevised(at(5, 18, 0), at(5, 18, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.flightDepartureAt()).isEqualTo(offset(5, 18, 0));
         assertThat(response.revisedDepartureAt()).isNull();
@@ -390,7 +414,7 @@ class DepartureTransferServiceTest {
         addExpressRoute();
         departAt(at(24, 5, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options().getFirst().departures()).containsExactly(new Departure(offset(23, 22, 40),
                 offset(23, 22, 55), offset(23, 23, 40), DepartureLabel.LATEST, true));
@@ -403,7 +427,7 @@ class DepartureTransferServiceTest {
         addExpressRoute();
         departAt(ZonedDateTime.of(2028, 11, 24, 5, 0, 0, 0, TOKYO));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options().getFirst().departures()).extracting(Departure::departAt)
                 .containsExactly(ZonedDateTime.of(2028, 11, 23, 23, 2, 0, 0, TOKYO).toOffsetDateTime());
@@ -417,7 +441,7 @@ class DepartureTransferServiceTest {
         routes.add(taxi());
         departAt(at(6, 5, 0), at(5, 23, 30));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.firstTrainTooLate()).isTrue();
         assertThat(response.noTimeAfterLanding()).isFalse();
@@ -435,7 +459,7 @@ class DepartureTransferServiceTest {
         routes.add(taxi());
         departAt(at(5, 15, 30), at(5, 13, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.firstTrainTooLate()).isTrue();
         assertThat(response.noTimeAfterLanding()).isTrue();
@@ -449,7 +473,7 @@ class DepartureTransferServiceTest {
         routes.add(taxi());
         departAt(at(5, 15, 30), at(5, 12, 40));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options().getLast().leaveByAt()).isEqualTo(offset(5, 12, 40));
         assertThat(response.noTimeAfterLanding()).isFalse();
@@ -462,7 +486,7 @@ class DepartureTransferServiceTest {
         routes.add(route(91, TransportMode.TAXI, "가까운 택시", 20, 0, 17000, 20000, Schedule.none()));
         departAt(at(5, 15, 30), at(5, 13, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.noTimeAfterLanding()).isFalse();
         assertThat(response.options()).extracting(Option::leaveByAt).containsExactly(null, offset(5, 13, 10));
@@ -477,7 +501,7 @@ class DepartureTransferServiceTest {
         routes.add(taxi());
         departAt(at(5, 15, 30), at(5, 12, 45));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.firstTrainTooLate()).isFalse();
         assertThat(response.noTimeAfterLanding()).isFalse();
@@ -491,7 +515,7 @@ class DepartureTransferServiceTest {
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(23 * 60 + 2)))));
         departAt(at(6, 5, 0), at(5, 22, 40));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.latestLeaveAt()).isEqualTo(offset(5, 22, 47));
         assertThat(response.firstTrainTooLate()).isFalse();
@@ -505,7 +529,7 @@ class DepartureTransferServiceTest {
                 Schedule.timetable(Map.of(DayType.WEEKDAY, minutes(14 * 60 + 30, 15 * 60)))));
         departAt(at(5, 18, 0), at(5, 14, 45));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         assertThat(response.options().getFirst().departures())
                 .containsExactly(inWindow(at(5, 15, 0), 5, 40, DepartureLabel.LATEST));
@@ -518,7 +542,7 @@ class DepartureTransferServiceTest {
         given(tripService.findOwned(TRIP_ID, "wrong"))
                 .willThrow(new BusinessException(ErrorCode.FORBIDDEN_TRIP, "이 여행에 접근할 권한이 없습니다."));
 
-        assertThatThrownBy(() -> service.departure(TRIP_ID, "wrong", 120))
+        assertThatThrownBy(() -> service.departure(TRIP_ID, "wrong", 120, FlightCheckResult.OUT_OF_WINDOW))
                 .isInstanceOfSatisfying(BusinessException.class,
                         e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.FORBIDDEN_TRIP));
         verifyNoInteractions(routeRepository);
@@ -529,7 +553,7 @@ class DepartureTransferServiceTest {
     void queriesRoutesByAirportAndArea() {
         departAt(at(5, 18, 0));
 
-        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120);
+        DepartureTransferResponse response = service.departure(TRIP_ID, TOKEN, 120, FlightCheckResult.OUT_OF_WINDOW);
 
         verify(routeRepository).findAllByAirportIdAndAreaIdAndDirectionAndActiveTrueOrderByIdAsc(1L, 11L,
                 RouteDirection.AREA_TO_AIRPORT);

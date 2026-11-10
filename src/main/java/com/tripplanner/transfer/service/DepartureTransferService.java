@@ -3,6 +3,7 @@ package com.tripplanner.transfer.service;
 import com.tripplanner.catalog.domain.Airport;
 import com.tripplanner.catalog.repository.AirportRepository;
 import com.tripplanner.transfer.api.ArrivalTransferResponse.Fare;
+import com.tripplanner.transfer.api.ArrivalTransferResponse.FlightCheck;
 import com.tripplanner.transfer.api.DepartureTransferResponse;
 import com.tripplanner.transfer.api.DepartureTransferResponse.Departure;
 import com.tripplanner.transfer.api.DepartureTransferResponse.DepartureLabel;
@@ -14,11 +15,13 @@ import com.tripplanner.transfer.repository.TransportRouteRepository;
 import com.tripplanner.trip.domain.FlightDirection;
 import com.tripplanner.trip.domain.Trip;
 import com.tripplanner.trip.domain.TripFlight;
+import com.tripplanner.trip.service.FlightCheckResult;
 import com.tripplanner.trip.service.TripService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -56,13 +59,17 @@ public class DepartureTransferService {
 
     /** @throws com.tripplanner.common.exception.BusinessException TRIP_NOT_FOUND, FORBIDDEN_TRIP */
     @Transactional(readOnly = true)
-    public DepartureTransferResponse departure(String tripId, String ownerToken, int airportBufferMin) {
-        return calculate(tripService.findOwned(tripId, ownerToken), airportBufferMin);
+    public DepartureTransferResponse departure(String tripId, String ownerToken, int airportBufferMin,
+            FlightCheckResult flightCheck) {
+        return calculate(tripService.findOwned(tripId, ownerToken), airportBufferMin, flightCheck);
     }
 
-    /** 소유자 확인을 마친 여행으로 계산한다. 일정 서비스가 호출자 트랜잭션 안에서 쓴다. */
+    /**
+     * 소유자 확인을 마친 여행으로 계산한다. 일정 서비스가 호출자 트랜잭션 안에서 쓴다.
+     * flightCheck는 호출 전 FlightRefreshService의 오는 편 재조회 결과다.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
-    public DepartureTransferResponse calculate(Trip trip, int airportBufferMin) {
+    public DepartureTransferResponse calculate(Trip trip, int airportBufferMin, FlightCheckResult flightCheck) {
         TripFlight returnFlight = trip.flight(FlightDirection.RETURN);
         Airport airport = TripAirports.find(airportRepository, trip, returnFlight.getDepAirportIata());
         ZoneId zone = ZoneId.of(airport.getTimezone());
@@ -102,7 +109,9 @@ public class DepartureTransferService {
         return new DepartureTransferResponse(flightDeparture.toOffsetDateTime(),
                 laterRevised(returnFlight, zone), deadline.toOffsetDateTime(), windowStart.toOffsetDateTime(),
                 zone.getId(), properties.boardingMarginMin(), firstTrainTooLate, noTimeAfterLanding, latestLeaveAt,
-                options);
+                returnFlight.getScheduledDepUtc().atZone(zone).toOffsetDateTime(), returnFlight.getStatus(),
+                new FlightCheck(flightCheck, returnFlight.getFetchedAt().truncatedTo(ChronoUnit.SECONDS).atZone(zone)
+                        .toOffsetDateTime()), options);
     }
 
     /** revised가 scheduled보다 늦을 때만 안내용으로 준다. */
