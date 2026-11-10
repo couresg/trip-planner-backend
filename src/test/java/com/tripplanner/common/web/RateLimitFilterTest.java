@@ -119,6 +119,18 @@ class RateLimitFilterTest {
     }
 
     @Test
+    @DisplayName("장소 추천 GET은 external 한도를 소비하고, 일정 조회처럼 다른 여행 경로는 소비하지 않는다")
+    void recommendationCountsAsExternal() throws Exception {
+        RateLimitFilter filter = filter(120, 1);
+        String trip = "/api/v1/trips/9f1c2b9e-6a43-4c1e-9f3a-2f6b1d7e8a01";
+        assertThat(call(filter, "GET", trip + "/recommendations/places").getStatus()).isEqualTo(200);
+        assertThat(call(filter, "GET", trip + "/itinerary").getStatus()).isEqualTo(200);
+        assertThat(call(filter, "GET", trip + "/recommendations/places/extra").getStatus()).isEqualTo(200);
+        assertThat(call(filter, "GET", trip + "/recommendations/places").getStatus()).isEqualTo(429);
+        assertThat(call(filter, "GET", "/api/v1/flights/lookup").getStatus()).isEqualTo(429);
+    }
+
+    @Test
     @DisplayName("IPv6는 /64 대역으로 묶고, IPv4와 IPv4-mapped IPv6는 같은 IPv4 키를 쓴다")
     void clientKey() throws Exception {
         assertThat(RateLimitFilter.clientKey("203.0.113.9")).isEqualTo("203.0.113.9");
