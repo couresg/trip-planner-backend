@@ -44,7 +44,12 @@ app:
   itinerary:
     return-margin-min: 30
     max-items-per-day: 200
-  # IP(remoteAddr) 기준. external은 GET /flights/lookup·POST /trips에 general과 함께 적용된다.
+  # 장소 추천기: mock(기본, 키 없음). claude·ollama 구현은 다음 단계 (docs/PRD.md 미결 사항)
+  recommend:
+    provider: mock
+    cache-ttl: 1h
+    cache-max-size: 1000
+  # IP(remoteAddr) 기준. external은 GET /flights/lookup·POST /trips·GET /trips/{id}/recommendations/places에 general과 함께 적용된다.
   rate-limit:
     enabled: true
     general-per-minute: 120

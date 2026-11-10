@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -30,7 +31,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
 
 /**
- * /api/v1 요청을 클라이언트 IP(remoteAddr) 기준으로 제한한다. 외부 항공 API를 부를 수 있는 요청은 general과 external
+ * /api/v1 요청을 클라이언트 IP(remoteAddr) 기준으로 제한한다. 외부 항공 API를 부를 수 있는 요청과 장소 추천은 general과 external
  * 두 버킷을 모두 소비한다. 한도를 넘으면 컨트롤러를 호출하지 않고 RATE_LIMITED(429) + Retry-After(초)로 응답한다.
  * 응답 본문은 GlobalExceptionHandler가 만들도록 HandlerExceptionResolver에 넘겨 다른 오류와 같은 형식을 유지한다.
  * X-Forwarded-For는 위조할 수 있어 믿지 않는다(프록시 뒤 배포는 백로그, docs/PRD.md 미결 사항).
@@ -42,6 +43,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final String API_PREFIX = "/api/v1/";
     private static final String HEALTH_PATH = "/api/v1/health";
     private static final Duration PERIOD = Duration.ofMinutes(1);
+    /** 장소 추천은 지금은 Mock이지만 다음 단계 LLM 호출에 비용이 들어 external로 센다. */
+    private static final Pattern RECOMMENDATION_PATH = Pattern.compile("/api/v1/trips/[^/]+/recommendations/places");
 
     private final RateLimitProperties properties;
     private final HandlerExceptionResolver exceptionResolver;
@@ -148,7 +151,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String path = path(request);
         String method = request.getMethod();
         // Spring MVC는 HEAD를 @GetMapping으로 처리하므로 GET과 같이 센다.
-        return (("GET".equals(method) || "HEAD".equals(method)) && path.equals("/api/v1/flights/lookup"))
+        boolean get = "GET".equals(method) || "HEAD".equals(method);
+        return (get && (path.equals("/api/v1/flights/lookup") || RECOMMENDATION_PATH.matcher(path).matches()))
                 || ("POST".equals(method) && path.equals("/api/v1/trips"));
     }
 
