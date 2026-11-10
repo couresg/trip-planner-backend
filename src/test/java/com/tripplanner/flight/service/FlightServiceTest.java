@@ -314,14 +314,23 @@ class FlightServiceTest {
     }
 
     @Test
-    @DisplayName("이미 출발한 편은 TTL이 6시간이다")
-    void pastFlightUsesLongTtl() {
+    @DisplayName("비행 중인 편은 지연 재조회가 새 값을 받도록 TTL이 10분이다")
+    void inAirFlightUsesShortTtl() {
         Instant afterDeparture = Instant.parse("2026-11-05T03:00:01Z");
         clock.set(afterDeparture);
 
         service.lookup(KE723, DATE);
 
-        assertThat(savedEntry().getExpiresAt()).isEqualTo(afterDeparture.plus(Duration.ofHours(6)));
+        assertThat(savedEntry().getExpiresAt()).isEqualTo(afterDeparture.plus(Duration.ofMinutes(10)));
+    }
+
+    @Test
+    @DisplayName("변경 도착(04:52Z) 3시간 뒤까지는 TTL이 10분이고 그 1초 뒤부터 6시간이다")
+    void ttlBoundaryAfterArrival() {
+        Instant limit = Instant.parse("2026-11-05T07:52:00Z");
+
+        assertThat(FlightService.ttl(List.of(ke723()), limit)).isEqualTo(Duration.ofMinutes(10));
+        assertThat(FlightService.ttl(List.of(ke723()), limit.plusSeconds(1))).isEqualTo(Duration.ofHours(6));
     }
 
     @Test

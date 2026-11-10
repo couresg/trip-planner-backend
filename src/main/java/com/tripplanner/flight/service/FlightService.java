@@ -32,7 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * 항공편 조회 + 캐시. 조회 순서: 메모리(Caffeine) → DB(flight_cache, 만료 전) → 공급자 → 메모리·DB 저장.
- * 캐시 TTL은 가장 이른 구간 출발이 지금부터 48시간 이내면 10분, 그 외(48시간 이후 또는 이미 출발)는 6시간이다.
+ * 캐시 TTL은 가장 이른 구간 출발 48시간 전부터 가장 늦은 구간 도착 3시간 뒤까지 10분, 그 외는 6시간이다.
  * 공급자 장애 시 만료된 DB 캐시라도 있으면 그 값을 쓰고, 장애 후 30초 동안은 공급자를 다시 부르지 않는다.
  * 같은 키의 동시 요청은 공급자를 한 번만 호출한다.
  *
@@ -46,6 +46,7 @@ public class FlightService {
     };
 
     static final Duration NEAR_DEPARTURE = Duration.ofHours(48);
+    static final Duration AFTER_ARRIVAL = Duration.ofHours(3);
     static final Duration SHORT_TTL = Duration.ofMinutes(10);
     static final Duration LONG_TTL = Duration.ofHours(6);
     /** 찾지 못한 편명은 DB에 저장하지 않고 메모리에만 이 시간 동안 둔다. */
@@ -156,13 +157,19 @@ public class FlightService {
         return legs.stream().filter(leg -> airportIatas.contains(leg.departure().iata())).findFirst();
     }
 
+    /** 가장 이른 구간 출발 - 48시간 ≤ now ≤ 가장 늦은 구간 도착 + 3시간이면 짧게 (지연 재조회가 비행 중에도 새 값을 받도록). */
     static Duration ttl(List<FlightLeg> legs, Instant now) {
         Instant earliestDeparture = legs.stream()
                 .map(leg -> leg.departure().effectiveTime())
                 .min(Comparator.naturalOrder())
                 .orElseThrow();
-        boolean departsSoon = !earliestDeparture.isBefore(now) && !earliestDeparture.isAfter(now.plus(NEAR_DEPARTURE));
-        return departsSoon ? SHORT_TTL : LONG_TTL;
+        Instant latestArrival = legs.stream()
+                .map(leg -> leg.arrival().effectiveTime())
+                .max(Comparator.naturalOrder())
+                .orElseThrow();
+        boolean active = !now.isBefore(earliestDeparture.minus(NEAR_DEPARTURE))
+                && !now.isAfter(latestArrival.plus(AFTER_ARRIVAL));
+        return active ? SHORT_TTL : LONG_TTL;
     }
 
     private List<FlightLeg> staleOrUnavailable(Optional<FlightCacheEntry> row, FlightProviderException cause) {
