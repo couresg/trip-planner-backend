@@ -31,9 +31,10 @@ docker compose up -d mysql
 ## 명령어
 
 ```bash
-./gradlew test                                          # 전체 테스트 (Docker 필요)
+./gradlew test                                          # 단위 테스트 (Docker 불필요)
+./gradlew integrationTest                               # 통합 테스트 (Docker 필요: Testcontainers)
 ./gradlew test --tests "*ArrivalTransferServiceTest"    # 특정 테스트
-./gradlew build                                         # 빌드 + 테스트
+./gradlew build                                         # 빌드 + 단위 테스트
 ```
 
 ## 환경변수

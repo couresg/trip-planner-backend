@@ -14,9 +14,10 @@
 
 ```bash
 ./gradlew bootRun --args='--spring.profiles.active=local'   # 실행
-./gradlew test                                               # 전체 테스트 (Docker 필요: Testcontainers)
+./gradlew test                                               # 단위 테스트 (Docker 불필요, @Tag("integration") 제외)
+./gradlew integrationTest                                    # 통합 테스트 (Docker 필요: Testcontainers)
 ./gradlew test --tests "*ArrivalTransferServiceTest"         # 특정 테스트
-./gradlew build                                              # 빌드 + 테스트
+./gradlew build                                              # 빌드 + 단위 테스트 (통합 테스트는 포함되지 않는다)
 ```
 
 ## 스택
@@ -32,7 +33,7 @@
 ```
 com.tripplanner
 ├── TripPlannerApplication.java
-├── common/        # exception(ErrorCode, BusinessException, GlobalExceptionHandler), time(TimeUtils), config, web
+├── common/        # exception(ErrorCode, BusinessException, GlobalExceptionHandler), config, web
 ├── catalog/       # City, Airport, Area — entity / repository / service / controller / dto
 ├── flight/        # FlightNumber(값 객체), FlightClient(+Mock/AeroDataBox), FlightService, FlightCache
 ├── trip/          # Trip, TripFlight, TripService, TripController, OwnerTokenService
@@ -52,7 +53,7 @@ com.tripplanner
 - 조회 서비스는 `@Transactional(readOnly = true)`, 변경은 `@Transactional`.
 - N+1 주의: 여행 상세·일정 조회는 fetch join 또는 `@EntityGraph`.
 - 예외: `BusinessException(ErrorCode)`를 던지고 `GlobalExceptionHandler`가 `ProblemDetail`로 변환한다. 에러 코드는 `docs/API_SPEC.md` 7장과 일치시킨다.
-- 설정값은 `@ConfigurationProperties` record로 묶는다 (예: `ExternalApiProperties`, `TransferProperties`).
+- 설정값은 `@ConfigurationProperties` record로 묶는다 (예: `AeroDataBoxProperties`, `TransferProperties`).
 - 시간
   - `Clock`을 빈으로 주입해서 쓴다 (`LocalDate.now()` 직접 호출 금지 → 테스트 불가).
   - 저장 `Instant`, 계산 `ZonedDateTime`(공항 timezone), 응답은 `OffsetDateTime`.
@@ -74,6 +75,8 @@ com.tripplanner
 - 스키마 변경 = Flyway 새 버전 파일 추가. 이미 적용된 마이그레이션 파일은 수정하지 않는다.
 - `spring.jpa.hibernate.ddl-auto=validate`, `open-in-view=false`
 - 시드 데이터는 `V100` 이후 번호를 쓰고, 스키마 변경은 `V2`~`V99`를 쓴다. 시드 뒤에 스키마 버전이 추가되므로 `spring.flyway.out-of-order=true`로 설정되어 있다.
+- 그래서 새 스키마 버전은 **새 DB에서는 시드보다 먼저, 기존 DB에서는 시드보다 나중에** 실행된다. 두 순서 모두에서 통과해야 한다: 기존 테이블에 추가하는 컬럼은 NULL 허용이거나 기본값을 두고, 시드 INSERT는 컬럼 목록을 명시한다. 통합 테스트(새 DB)로 확인한다.
+- 통합 테스트는 `@Tag("integration")`을 붙인다 (`./gradlew integrationTest`로만 실행된다).
 
 ## 하지 말 것
 
