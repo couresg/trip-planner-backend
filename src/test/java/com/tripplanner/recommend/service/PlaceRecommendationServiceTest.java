@@ -149,6 +149,15 @@ class PlaceRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("유니코드 제어·서식 문자(U+202E 양방향, U+2028 줄 구분, U+0085 C1, 줄바꿈 없는 공백)도 공백 하나로 바뀐다")
+    void stripsUnicodeControlAndFormatChars() {
+        Place place = place(501, PlaceCategory.SIGHT);
+
+        assertThat(PlaceRecommendationService.reason("가‮나 다\u0085라 마 　바​사", place))
+                .isEqualTo("가 나 다 라 마 바 사");
+    }
+
+    @Test
     @DisplayName("이유는 코드 포인트 기준 200자로 자르므로 이모지(서로게이트 쌍)가 깨지지 않는다")
     void cutsByCodePoints() {
         Place place = place(501, PlaceCategory.SIGHT);

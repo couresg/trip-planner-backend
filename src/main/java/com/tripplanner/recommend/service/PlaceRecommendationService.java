@@ -43,8 +43,9 @@ public class PlaceRecommendationService {
 
     /** 이유 최대 길이 (유니코드 코드 포인트) */
     static final int REASON_MAX_LENGTH = 200;
-    private static final Pattern CONTROL = Pattern.compile("\\p{Cntrl}");
-    private static final Pattern SPACES = Pattern.compile("\\s+");
+    /** 유니코드 제어(Cc, C1 포함)·서식(Cf, 양방향 U+202E·ZWJ 등)·줄/문단 구분자(U+2028·U+2029). \p{Cntrl}은 ASCII만 본다. */
+    private static final Pattern CONTROL = Pattern.compile("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]");
+    private static final Pattern SPACES = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Logger log = LoggerFactory.getLogger(PlaceRecommendationService.class);
 
