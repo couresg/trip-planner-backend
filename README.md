@@ -24,7 +24,7 @@ docker compose up -d mysql
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
 
-`local` 프로파일은 `../.env`를 properties 형식으로 읽는다 (OS 환경변수가 있으면 우선). 로그 레벨은 `com.tripplanner=DEBUG`, CORS 허용 origin은 `http://localhost:5173`.
+`local` 프로파일은 `../.env`를 properties 형식으로 읽는다 (OS 환경변수가 있으면 우선). 로그 레벨은 `com.tripplanner=DEBUG`·`org.hibernate.SQL=DEBUG`(실행 SQL)이고, 요청 로그(`app.request-log.enabled=true`)가 `/api/` 요청마다 `메서드 경로 -> 상태 (ms)` 한 줄을 남긴다(헤더·쿼리 문자열·본문은 남기지 않음). CORS 허용 origin은 `http://localhost:5173`.
 
 주의: Windows에서는 DB 주소에 `localhost` 대신 `127.0.0.1`을 쓴다. bash에서 `source .env`는 하지 않는다 (`DB_URL`의 `&` 때문).
 
@@ -58,6 +58,7 @@ docker compose up -d mysql
 | `app.itinerary.*` | 일정 규칙 (`return-margin-min`, `max-items-per-day`) |
 | `app.recommend.*` | 장소 추천 (`provider`: `mock`만 구현, `cache-ttl` 1h, `cache-max-size` 1000) |
 | `app.cors.allowed-origins` | CORS 허용 origin (`local` 프로파일) |
+| `app.request-log.enabled` | `true`면 `/api/` 요청 한 줄 로그 (`RequestLoggingFilter`, 기본 꺼짐, `local`에서 켬) |
 | `app.rate-limit.*` | 요청 횟수 제한 (아래) |
 
 ### 요청 횟수 제한

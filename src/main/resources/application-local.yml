@@ -7,7 +7,12 @@ spring:
 logging:
   level:
     com.tripplanner: DEBUG
+    # 실행되는 SQL. 바인딩 값까지 보려면 org.hibernate.orm.jdbc.bind: TRACE (토큰 해시 등도 찍히므로 기본은 끔)
+    org.hibernate.SQL: DEBUG
 
 app:
+  # 요청마다 "메서드 경로 -> 상태 (ms)" 한 줄 (RequestLoggingFilter)
+  request-log:
+    enabled: true
   cors:
     allowed-origins: http://localhost:5173
